@@ -101,11 +101,21 @@ type MechanizedGemMiningLicense struct {
 	Status    string `json:"status" bson:"status"` // "draft" | "submitted" | "approved" | "rejected"
 }
 
+// PaginatedMiningLicenses represents a paginated list of license applications
+type PaginatedMiningLicenses struct {
+	Data       []MechanizedGemMiningLicense `json:"data"`
+	Total      int64                        `json:"total"`
+	Page       int                          `json:"page"`
+	Limit      int                          `json:"limit"`
+	TotalPages int                          `json:"totalPages"`
+}
+
 // MiningLicenseRepository defines DB operations for mining license applications
 type MiningLicenseRepository interface {
 	Create(ctx context.Context, license *MechanizedGemMiningLicense) error
 	GetByID(ctx context.Context, id string) (*MechanizedGemMiningLicense, error)
 	GetAll(ctx context.Context) ([]MechanizedGemMiningLicense, error)
+	GetByTIN(ctx context.Context, tin string, page int, limit int) (*PaginatedMiningLicenses, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 }
 
@@ -114,5 +124,6 @@ type MiningLicenseUsecase interface {
 	Submit(ctx context.Context, license *MechanizedGemMiningLicense) (*MechanizedGemMiningLicense, error)
 	GetByID(ctx context.Context, id string) (*MechanizedGemMiningLicense, error)
 	GetAll(ctx context.Context) ([]MechanizedGemMiningLicense, error)
+	GetByTIN(ctx context.Context, tin string, page int, limit int) (*PaginatedMiningLicenses, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 }

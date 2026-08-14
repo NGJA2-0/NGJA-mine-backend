@@ -136,6 +136,20 @@ func (u *miningLicenseUsecase) GetAll(ctx context.Context) ([]domain.MechanizedG
 	return u.repo.GetAll(ctx)
 }
 
+// GetByTIN retrieves all license applications for a specific TIN number.
+func (u *miningLicenseUsecase) GetByTIN(ctx context.Context, tin string, page int, limit int) (*domain.PaginatedMiningLicenses, error) {
+	if tin == "" {
+		return nil, errors.New("TIN number is required")
+	}
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	return u.repo.GetByTIN(ctx, tin, page, limit)
+}
+
 // UpdateStatus updates only the status of a license application.
 func (u *miningLicenseUsecase) UpdateStatus(ctx context.Context, id string, status string) error {
 	allowed := map[string]bool{"draft": true, "submitted": true, "approved": true, "rejected": true}

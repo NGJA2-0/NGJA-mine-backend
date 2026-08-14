@@ -24,6 +24,7 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api := app.Group("/api/mining-licenses")
 	api.Post("/", auth, handler.Submit)
 	api.Get("/", auth, handler.GetAll)
+	api.Get("/tin/:tin", auth, handler.GetByTIN)
 	api.Get("/:id", auth, handler.GetByID)
 	api.Patch("/:id/status", auth, handler.UpdateStatus)
 }
@@ -110,6 +111,33 @@ func (h *MiningLicenseHandler) GetByID(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "License application retrieved successfully",
 		"data":    license,
+	})
+}
+
+// GetByTIN godoc
+// GET /api/mining-licenses/tin/:tin
+// Returns all mining license applications by the applicant's TIN number.
+func (h *MiningLicenseHandler) GetByTIN(c *fiber.Ctx) error {
+	tin := c.Params("tin")
+	if tin == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "TIN number is required",
+		})
+	}
+
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+
+	paginatedLicenses, err := h.Usecase.GetByTIN(c.Context(), tin, page, limit)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "License applications retrieved successfully",
+		"data":    paginatedLicenses,
 	})
 }
 

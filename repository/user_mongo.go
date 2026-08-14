@@ -43,3 +43,21 @@ func (r *userMongoRepo) GetUserByNIC(ctx context.Context, nic string) (*domain.U
 	}
 	return &user, nil
 }
+
+// GetUserByID fetches a user by their MongoDB ObjectID string
+func (r *userMongoRepo) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, errors.New("invalid user ID format")
+	}
+
+	var user domain.User
+	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+	return &user, nil
+}

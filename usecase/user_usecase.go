@@ -89,3 +89,8 @@ func (u *userUsecase) generateToken(userID string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(u.jwtSecret))
 }
+
+// GetUserByID retrieves a user by their MongoDB ObjectID string
+func (u *userUsecase) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
+	return u.userRepo.GetUserByID(ctx, id)
+}

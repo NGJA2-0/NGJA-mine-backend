@@ -33,12 +33,15 @@ func main() {
 
 	// Setup Repositories
 	userRepo := repository.NewUserRepository(db)
+	miningLicenseRepo := repository.NewMiningLicenseRepository(db)
 
 	// Setup Usecases
 	userUsecase := usecase.NewUserUsecase(userRepo, env.JWTSecret)
+	miningLicenseUsecase := usecase.NewMiningLicenseUsecase(miningLicenseRepo)
 
 	// Setup Handlers (Routes)
 	httpHandler.NewUserHandler(app, userUsecase)
+	httpHandler.NewMiningLicenseHandler(app, miningLicenseUsecase, userUsecase, env.JWTSecret)
 
 	// Root GET Route
 	app.Get("/", func(c *fiber.Ctx) error {

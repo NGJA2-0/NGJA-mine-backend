@@ -31,10 +31,12 @@ type UserLoginRequest struct {
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *User) error
 	GetUserByNIC(ctx context.Context, nic string) (*User, error)
+	GetUserByID(ctx context.Context, id string) (*User, error)
 }
 
 // UserUsecase defines the business logic operations for User
 type UserUsecase interface {
 	Signup(ctx context.Context, req *UserSignupRequest) (*User, string, error) // returns user, token, error
 	Login(ctx context.Context, req *UserLoginRequest) (*User, string, error)   // returns user, token, error
+	GetUserByID(ctx context.Context, id string) (*User, error)
 }

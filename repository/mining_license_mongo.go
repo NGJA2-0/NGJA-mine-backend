@@ -1,0 +1,85 @@
+package repository
+
+import (
+	"context"
+	"errors"
+
+	"my-fiber-app/domain"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+)
+
+type miningLicenseMongoRepo struct {
+	collection *mongo.Collection
+}
+
+// NewMiningLicenseRepository creates a new repository backed by the
+// "mechanized_gem_mining_licenses" collection.
+func NewMiningLicenseRepository(db *mongo.Database) domain.MiningLicenseRepository {
+	return &miningLicenseMongoRepo{
+		collection: db.Collection("mechanized_gem_mining_licenses"),
+	}
+}
+
+// Create inserts a new license application document into MongoDB.
+func (r *miningLicenseMongoRepo) Create(ctx context.Context, license *domain.MechanizedGemMiningLicense) error {
+	license.ID = primitive.NewObjectID()
+	_, err := r.collection.InsertOne(ctx, license)
+	return err
+}
+
+// GetByID fetches a single license by its MongoDB ObjectID string.
+func (r *miningLicenseMongoRepo) GetByID(ctx context.Context, id string) (*domain.MechanizedGemMiningLicense, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, errors.New("invalid license ID format")
+	}
+
+	var license domain.MechanizedGemMiningLicense
+	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&license)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, errors.New("license not found")
+		}
+		return nil, err
+	}
+	return &license, nil
+}
+
+// GetAll returns every license application document in the collection.
+func (r *miningLicenseMongoRepo) GetAll(ctx context.Context) ([]domain.MechanizedGemMiningLicense, error) {
+	cursor, err := r.collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var licenses []domain.MechanizedGemMiningLicense
+	if err = cursor.All(ctx, &licenses); err != nil {
+		return nil, err
+	}
+	return licenses, nil
+}
+
+// UpdateStatus changes only the status field of a license document.
+func (r *miningLicenseMongoRepo) UpdateStatus(ctx context.Context, id string, status string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return errors.New("invalid license ID format")
+	}
+
+	result, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": oid},
+		bson.M{"$set": bson.M{"status": status}},
+	)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return errors.New("license not found")
+	}
+	return nil
+}

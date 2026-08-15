@@ -111,6 +111,48 @@ func (r *miningLicenseMongoRepo) GetByTIN(ctx context.Context, tin string, page 
 	}, nil
 }
 
+// GetForMap returns license applications matching the given filters,
+// restricted to records that have at least one GPS point.
+func (r *miningLicenseMongoRepo) GetForMap(ctx context.Context, filters domain.MapFilters) ([]domain.MechanizedGemMiningLicense, error) {
+	filter := bson.M{
+		"gpsPoints": bson.M{"$exists": true, "$ne": bson.A{}},
+	}
+
+	if filters.District != "" {
+		filter["district"] = filters.District
+	}
+	if filters.Village != "" {
+		filter["village"] = filters.Village
+	}
+	if filters.TIN != "" {
+		filter["tin"] = filters.TIN
+	}
+	if filters.NIC != "" {
+		filter["nic"] = filters.NIC
+	}
+	if filters.GMLNumber != "" {
+		filter["gmlNumber"] = filters.GMLNumber
+	}
+	if filters.LandName != "" {
+		filter["landName"] = bson.M{"$regex": filters.LandName, "$options": "i"}
+	}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var licenses []domain.MechanizedGemMiningLicense
+	if err = cursor.All(ctx, &licenses); err != nil {
+		return nil, err
+	}
+	if licenses == nil {
+		licenses = []domain.MechanizedGemMiningLicense{}
+	}
+	return licenses, nil
+}
+
 // UpdateStatus changes only the status field of a license document.
 func (r *miningLicenseMongoRepo) UpdateStatus(ctx context.Context, id string, status string) error {
 	oid, err := primitive.ObjectIDFromHex(id)

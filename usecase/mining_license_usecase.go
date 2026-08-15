@@ -150,6 +150,12 @@ func (u *miningLicenseUsecase) GetByTIN(ctx context.Context, tin string, page in
 	return u.repo.GetByTIN(ctx, tin, page, limit)
 }
 
+// GetForMap retrieves license applications for the map view, filtered by
+// any combination of district, village, TIN, NIC, GML number, or land name.
+func (u *miningLicenseUsecase) GetForMap(ctx context.Context, filters domain.MapFilters) ([]domain.MechanizedGemMiningLicense, error) {
+	return u.repo.GetForMap(ctx, filters)
+}
+
 // UpdateStatus updates only the status of a license application.
 func (u *miningLicenseUsecase) UpdateStatus(ctx context.Context, id string, status string) error {
 	allowed := map[string]bool{"draft": true, "submitted": true, "approved": true, "rejected": true}

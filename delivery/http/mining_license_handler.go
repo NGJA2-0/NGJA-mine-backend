@@ -25,6 +25,7 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Post("/", auth, handler.Submit)
 	api.Get("/", auth, handler.GetAll)
 	api.Get("/tin/:tin", auth, handler.GetByTIN)
+	api.Get("/map", auth, handler.GetForMap) 
 	api.Get("/:id", auth, handler.GetByID)
 	api.Patch("/:id/status", auth, handler.UpdateStatus)
 }
@@ -138,6 +139,33 @@ func (h *MiningLicenseHandler) GetByTIN(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "License applications retrieved successfully",
 		"data":    paginatedLicenses,
+	})
+}
+
+// GetForMap godoc
+// GET /api/mining-licenses/map
+// Returns license applications with GPS points, optionally filtered by
+// district, village, tin, nic, gmlNumber, or landName query params.
+func (h *MiningLicenseHandler) GetForMap(c *fiber.Ctx) error {
+	filters := domain.MapFilters{
+		District:  c.Query("district"),
+		Village:   c.Query("village"),
+		TIN:       c.Query("tin"),
+		NIC:       c.Query("nic"),
+		GMLNumber: c.Query("gmlNumber"),
+		LandName:  c.Query("landName"),
+	}
+
+	licenses, err := h.Usecase.GetForMap(c.Context(), filters)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Map license applications retrieved successfully",
+		"data":    licenses,
 	})
 }
 

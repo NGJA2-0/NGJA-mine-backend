@@ -13,6 +13,16 @@ type GPSPoint struct {
 	Longitude string `json:"longitude" bson:"longitude"`
 }
 
+// MapFilters holds optional query filters for the map view.
+type MapFilters struct {
+	District  string
+	Village   string
+	TIN       string
+	NIC       string
+	GMLNumber string
+	LandName  string
+}
+
 // MechanizedGemMiningLicense represents the full license application document stored in MongoDB
 type MechanizedGemMiningLicense struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
@@ -116,6 +126,7 @@ type MiningLicenseRepository interface {
 	GetByID(ctx context.Context, id string) (*MechanizedGemMiningLicense, error)
 	GetAll(ctx context.Context) ([]MechanizedGemMiningLicense, error)
 	GetByTIN(ctx context.Context, tin string, page int, limit int) (*PaginatedMiningLicenses, error)
+	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 }
 
@@ -125,5 +136,6 @@ type MiningLicenseUsecase interface {
 	GetByID(ctx context.Context, id string) (*MechanizedGemMiningLicense, error)
 	GetAll(ctx context.Context) ([]MechanizedGemMiningLicense, error)
 	GetByTIN(ctx context.Context, tin string, page int, limit int) (*PaginatedMiningLicenses, error)
+	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 }

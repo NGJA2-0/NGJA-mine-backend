@@ -148,12 +148,14 @@ func (h *MiningLicenseHandler) GetByTIN(c *fiber.Ctx) error {
 // district, village, tin, nic, gmlNumber, or landName query params.
 func (h *MiningLicenseHandler) GetForMap(c *fiber.Ctx) error {
 	filters := domain.MapFilters{
-		District:  c.Query("district"),
-		Village:   c.Query("village"),
-		TIN:       c.Query("tin"),
-		NIC:       c.Query("nic"),
-		GMLNumber: c.Query("gmlNumber"),
-		LandName:  c.Query("landName"),
+		District:       c.Query("district"),
+		Village:        c.Query("village"),
+		RegionalOffice: c.Query("regionalOffice"),
+		TIN:            c.Query("tin"),
+		NIC:            c.Query("nic"),
+		GMLNumber:      c.Query("gmlNumber"),
+		LandName:       c.Query("landName"),
+		Search:         c.Query("q"),
 	}
 
 	licenses, err := h.Usecase.GetForMap(c.Context(), filters)

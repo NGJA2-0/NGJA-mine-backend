@@ -17,10 +17,12 @@ type GPSPoint struct {
 type MapFilters struct {
 	District  string
 	Village   string
+	RegionalOffice string
 	TIN       string
 	NIC       string
 	GMLNumber string
 	LandName  string
+	Search        string
 }
 
 // MechanizedGemMiningLicense represents the full license application document stored in MongoDB

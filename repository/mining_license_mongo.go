@@ -136,6 +136,19 @@ func (r *miningLicenseMongoRepo) GetForMap(ctx context.Context, filters domain.M
 	if filters.LandName != "" {
 		filter["landName"] = bson.M{"$regex": filters.LandName, "$options": "i"}
 	}
+	if filters.RegionalOffice != "" {
+    	filter["regionalOffice"] = filters.RegionalOffice
+	}
+
+	if filters.Search != "" {
+		searchRegex := bson.M{"$regex": filters.Search, "$options": "i"}
+		filter["$or"] = bson.A{
+			bson.M{"tin": searchRegex},
+			bson.M{"nic": searchRegex},
+			bson.M{"gmlNumber": searchRegex},
+			bson.M{"landName": searchRegex},
+		}
+	}
 
 	cursor, err := r.collection.Find(ctx, filter)
 	if err != nil {

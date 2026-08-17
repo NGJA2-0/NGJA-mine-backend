@@ -30,6 +30,7 @@ type MechanizedGemMiningLicense struct {
 	ID        primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
 	UpdatedAt time.Time          `json:"updatedAt" bson:"updatedAt"`
+	ReferenceNumber string       `json:"referenceNumber" bson:"referenceNumber"`
 
 	// Applicant details
 	ApplicantName    string `json:"applicantName" bson:"applicantName"`
@@ -130,6 +131,7 @@ type MiningLicenseRepository interface {
 	GetByTIN(ctx context.Context, tin string, page int, limit int) (*PaginatedMiningLicenses, error)
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
+	GetNextBaseReferenceNumber(ctx context.Context) (int64, error)
 }
 
 // MiningLicenseUsecase defines business logic for mining license applications
@@ -140,4 +142,5 @@ type MiningLicenseUsecase interface {
 	GetByTIN(ctx context.Context, tin string, page int, limit int) (*PaginatedMiningLicenses, error)
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
+	Edit(ctx context.Context, id string, updatedLicense *MechanizedGemMiningLicense) (*MechanizedGemMiningLicense, error)
 }

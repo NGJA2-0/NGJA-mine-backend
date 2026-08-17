@@ -27,6 +27,7 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Get("/tin/:tin", auth, handler.GetByTIN)
 	api.Get("/map", auth, handler.GetForMap) 
 	api.Get("/:id", auth, handler.GetByID)
+	api.Post("/:id/edit", auth, handler.Edit)
 	api.Patch("/:id/status", auth, handler.UpdateStatus)
 }
 
@@ -205,5 +206,55 @@ func (h *MiningLicenseHandler) UpdateStatus(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "License status updated successfully",
+	})
+}
+
+// Edit godoc
+// POST /api/mining-licenses/:id/edit
+// Creates a new versioned edit of an existing mining license application.
+// The createdBy field is resolved automatically from the JWT token.
+func (h *MiningLicenseHandler) Edit(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "License ID is required",
+		})
+	}
+
+	var updatedLicense domain.MechanizedGemMiningLicense
+	if err := c.BodyParser(&updatedLicense); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body: " + err.Error(),
+		})
+	}
+
+	// Resolve the submitting user's name from the JWT token
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Could not identify the requesting user",
+		})
+	}
+
+	user, err := h.UserUsecase.GetUserByID(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not found: " + err.Error(),
+		})
+	}
+
+	// Always use the token owner's name
+	updatedLicense.CreatedBy = user.Name
+
+	result, err := h.Usecase.Edit(c.Context(), id, &updatedLicense)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "License application edited successfully",
+		"data":    result,
 	})
 }

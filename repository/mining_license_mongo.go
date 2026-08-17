@@ -15,14 +15,16 @@ import (
 )
 
 type miningLicenseMongoRepo struct {
-	collection *mongo.Collection
+	collection         *mongo.Collection
+	countersCollection *mongo.Collection
 }
 
 // NewMiningLicenseRepository creates a new repository backed by the
 // "mechanized_gem_mining_licenses" collection.
 func NewMiningLicenseRepository(db *mongo.Database) domain.MiningLicenseRepository {
 	return &miningLicenseMongoRepo{
-		collection: db.Collection("mechanized_gem_mining_licenses"),
+		collection:         db.Collection("mechanized_gem_mining_licenses"),
+		countersCollection: db.Collection("counters"),
 	}
 }
 
@@ -185,4 +187,21 @@ func (r *miningLicenseMongoRepo) UpdateStatus(ctx context.Context, id string, st
 		return errors.New("license not found")
 	}
 	return nil
+}
+
+// GetNextBaseReferenceNumber gets the next auto-incrementing integer for reference numbers.
+func (r *miningLicenseMongoRepo) GetNextBaseReferenceNumber(ctx context.Context) (int64, error) {
+	filter := bson.M{"_id": "mining_license_ref"}
+	update := bson.M{"$inc": bson.M{"seq": 1}}
+	opts := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
+
+	var result struct {
+		Seq int64 `bson:"seq"`
+	}
+
+	err := r.countersCollection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&result)
+	if err != nil {
+		return 0, err
+	}
+	return result.Seq, nil
 }

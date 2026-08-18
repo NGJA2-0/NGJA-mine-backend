@@ -86,32 +86,8 @@ func (u *miningLicenseUsecase) Submit(ctx context.Context, license *domain.Mecha
 		}
 	}
 
-	// ── Conditional: existing pits history ───────────────────────────────────
-	if license.ExistingPits == "yes" {
-		if license.PrevLicenseFirstDate == "" {
-			return nil, errors.New("prevLicenseFirstDate is required when existingPits is yes")
-		}
-		if license.ExtensionCount == nil {
-			return nil, errors.New("extensionCount is required when existingPits is yes")
-		}
-		if license.MinedGemValue == "" {
-			return nil, errors.New("minedGemValue is required when existingPits is yes")
-		}
-		if license.ConditionBreach == "" {
-			return nil, errors.New("conditionBreach is required when existingPits is yes")
-		}
-		if license.OwnershipComplaint == "" {
-			return nil, errors.New("ownershipComplaint is required when existingPits is yes")
-		}
-	}
-
-	// ── Conditional: breach / complaint details ───────────────────────────────
-	if license.ConditionBreach == "yes" && license.ConditionBreachDetails == "" {
-		return nil, errors.New("conditionBreachDetails is required when conditionBreach is yes")
-	}
-	if license.OwnershipComplaint == "yes" && license.ComplaintDetails == "" {
-		return nil, errors.New("complaintDetails is required when ownershipComplaint is yes")
-	}
+	// ── Conditional: existing pits history (fields are now free-text, no conditional required) ────
+	// existingPits is now a free-text surface area string — no conditional sub-validations needed.
 
 	// ── Defaults ──────────────────────────────────────────────────────────────
 	now := time.Now().UTC()

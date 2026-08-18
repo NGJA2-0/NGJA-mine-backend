@@ -90,7 +90,7 @@ type MechanizedGemMiningLicense struct {
 	ConditionBreachDetails string   `json:"conditionBreachDetails,omitempty" bson:"conditionBreachDetails,omitempty"`
 	OwnershipComplaint     string   `json:"ownershipComplaint,omitempty" bson:"ownershipComplaint,omitempty"`
 	ComplaintDetails       string   `json:"complaintDetails,omitempty" bson:"complaintDetails,omitempty"`
-	ProposedDepth          interface{} `json:"proposedDepth,omitempty" bson:"proposedDepth,omitempty"` // Deprecated: accepts string or number for backward compatibility
+	ProposedDepth          *float64 `json:"proposedDepth,omitempty" bson:"proposedDepth,omitempty"`
 
 	// Mining proposal
 	LandCultivation string `json:"landCultivation,omitempty" bson:"landCultivation,omitempty"`

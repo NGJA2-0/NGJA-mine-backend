@@ -13,6 +13,12 @@ type GPSPoint struct {
 	Longitude string `json:"longitude" bson:"longitude"`
 }
 
+// GemSaleDetails holds gem sale figures over the past 12 months
+type GemSaleDetails struct {
+	PrivateValue string `json:"privateValue" bson:"privateValue"` // Value from private sales (Rs.)
+	AuctionValue string `json:"auctionValue" bson:"auctionValue"` // Value from auction sales (Rs.)
+}
+
 // MapFilters holds optional query filters for the map view.
 type MapFilters struct {
 	District  string
@@ -70,19 +76,24 @@ type MechanizedGemMiningLicense struct {
 	ConsentLetterAttached string `json:"consentLetterAttached,omitempty" bson:"consentLetterAttached,omitempty"` // "yes" | "no"
 	GovLandAct            string `json:"govLandAct,omitempty" bson:"govLandAct,omitempty"`                       // "yes" | "no"
 
-	// Existing pits history (conditional on existingPits == "yes")
-	ExistingPits          string `json:"existingPits" bson:"existingPits"` // "yes" | "no"
-	PrevLicenseFirstDate  string `json:"prevLicenseFirstDate,omitempty" bson:"prevLicenseFirstDate,omitempty"`
-	ExtensionCount        *int   `json:"extensionCount,omitempty" bson:"extensionCount,omitempty"`
-	MinedGemValue         string `json:"minedGemValue,omitempty" bson:"minedGemValue,omitempty"`
-	ConditionBreach       string `json:"conditionBreach,omitempty" bson:"conditionBreach,omitempty"` // "yes" | "no"
-	ConditionBreachDetails string `json:"conditionBreachDetails,omitempty" bson:"conditionBreachDetails,omitempty"`
-	OwnershipComplaint    string `json:"ownershipComplaint,omitempty" bson:"ownershipComplaint,omitempty"` // "yes" | "no"
-	ComplaintDetails      string `json:"complaintDetails,omitempty" bson:"complaintDetails,omitempty"`
+	// Pit / mining history fields (new semantics as of v2)
+	ExistingPits         string `json:"existingPits" bson:"existingPits"`                                   // Free text: surface area of currently cut pits
+	PrevLicenseFirstDate string `json:"prevLicenseFirstDate,omitempty" bson:"prevLicenseFirstDate,omitempty"` // Free text: area maintained as silt/sludge pits (sq. ft)
+	ExtensionCount       *int   `json:"extensionCount,omitempty" bson:"extensionCount,omitempty"`           // Numeric: proposed depth amount
+	MinedGemValue        string `json:"minedGemValue,omitempty" bson:"minedGemValue,omitempty"`             // "yes"|"no": condition breaches in last 3 months?
+	ConditionBreach      string `json:"conditionBreach,omitempty" bson:"conditionBreach,omitempty"`         // "yes"|"no": NGJA1/03/2025 circular reports submitted?
+
+	// Gem sale details over the past 12 months (replaces deprecated ownership-complaint fields)
+	GemSaleDetails *GemSaleDetails `json:"gemSaleDetails,omitempty" bson:"gemSaleDetails,omitempty"`
+
+	// Deprecated fields — retained for backward compatibility with old records only
+	ConditionBreachDetails string   `json:"conditionBreachDetails,omitempty" bson:"conditionBreachDetails,omitempty"`
+	OwnershipComplaint     string   `json:"ownershipComplaint,omitempty" bson:"ownershipComplaint,omitempty"`
+	ComplaintDetails       string   `json:"complaintDetails,omitempty" bson:"complaintDetails,omitempty"`
+	ProposedDepth          *float64 `json:"proposedDepth,omitempty" bson:"proposedDepth,omitempty"`
 
 	// Mining proposal
-	ProposedDepth   *float64 `json:"proposedDepth,omitempty" bson:"proposedDepth,omitempty"`
-	LandCultivation string   `json:"landCultivation,omitempty" bson:"landCultivation,omitempty"`
+	LandCultivation string `json:"landCultivation,omitempty" bson:"landCultivation,omitempty"`
 
 	// Boundaries
 	BoundaryNorth         string `json:"boundaryNorth,omitempty" bson:"boundaryNorth,omitempty"`

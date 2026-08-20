@@ -103,11 +103,13 @@ type MechanizedGemMiningLicense struct {
 	MaxPcCount               string `json:"maxPcCount,omitempty" bson:"maxPcCount,omitempty"`
 	BackhoeCount             string `json:"backhoeCount,omitempty" bson:"backhoeCount,omitempty"`
 	GerumCount               string `json:"gerumCount,omitempty" bson:"gerumCount,omitempty"`
-	AdumMachineCount         string `json:"adumMachineCount,omitempty" bson:"adumMachineCount,omitempty"`
-	SilageExtent             string `json:"silageExtent,omitempty" bson:"silageExtent,omitempty"`
-	DepositAmount            string `json:"depositAmount,omitempty" bson:"depositAmount,omitempty"`
-	RiverbankProtectionAmount string `json:"riverbankProtectionAmount,omitempty" bson:"riverbankProtectionAmount,omitempty"`
-	SpecialCaseAmount        string `json:"specialCaseAmount,omitempty" bson:"specialCaseAmount,omitempty"`
+
+	// Deprecated: The following fields are no longer required and have been removed from the frontend.
+	// AdumMachineCount         string `json:"-" bson:"-"`
+	// SilageExtent             string `json:"-" bson:"-"`
+	// DepositAmount            string `json:"-" bson:"-"`
+	// RiverbankProtectionAmount string `json:"-" bson:"-"`
+	// SpecialCaseAmount        string `json:"-" bson:"-"`
 
 	// Metadata
 	CreatedBy string `json:"createdBy,omitempty" bson:"createdBy,omitempty"`

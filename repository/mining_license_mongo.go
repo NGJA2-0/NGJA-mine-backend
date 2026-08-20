@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"math"
+	"strconv"
+	"strings"
 
 	"my-fiber-app/domain"
 
@@ -205,3 +207,48 @@ func (r *miningLicenseMongoRepo) GetNextBaseReferenceNumber(ctx context.Context)
 	}
 	return result.Seq, nil
 }
+
+// GetMaxVersionByBaseRef finds the highest version suffix currently stored for
+// a given base reference number (e.g. "REF_2").
+// It queries all documents whose referenceNumber starts with "<baseRef>."
+// and returns the maximum integer suffix found.
+// Returns 0 if no versioned documents exist yet.
+func (r *miningLicenseMongoRepo) GetMaxVersionByBaseRef(ctx context.Context, baseRef string) (int, error) {
+	prefix := baseRef + "."
+	filter := bson.M{
+		"referenceNumber": bson.M{
+			"$regex": "^" + prefix,
+		},
+	}
+
+	findOptions := options.Find().SetProjection(bson.M{"referenceNumber": 1})
+	cursor, err := r.collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return 0, err
+	}
+	defer cursor.Close(ctx)
+
+	maxVersion := 0
+	for cursor.Next(ctx) {
+		var doc struct {
+			ReferenceNumber string `bson:"referenceNumber"`
+		}
+		if err := cursor.Decode(&doc); err != nil {
+			continue
+		}
+		after, found := strings.CutPrefix(doc.ReferenceNumber, prefix)
+		if !found {
+			continue
+		}
+		// Only count single-level suffixes (e.g. "1" in "REF_2.1")
+		if strings.Contains(after, ".") {
+			continue
+		}
+		if v, err := strconv.Atoi(after); err == nil && v > maxVersion {
+			maxVersion = v
+		}
+	}
+
+	return maxVersion, cursor.Err()
+}
+

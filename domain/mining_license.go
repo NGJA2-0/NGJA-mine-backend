@@ -134,6 +134,9 @@ type MiningLicenseRepository interface {
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	GetNextBaseReferenceNumber(ctx context.Context) (int64, error)
+	// GetMaxVersionByBaseRef returns the highest version suffix (e.g. 2 for "REF_2.2") stored
+	// for the given base reference number (e.g. "REF_2"). Returns 0 if none exist yet.
+	GetMaxVersionByBaseRef(ctx context.Context, baseRef string) (int, error)
 }
 
 // MiningLicenseUsecase defines business logic for mining license applications

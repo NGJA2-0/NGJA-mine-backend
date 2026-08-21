@@ -215,9 +215,33 @@ func (u *miningLicenseUsecase) Edit(ctx context.Context, id string, updatedLicen
 
 	// 6. Persist as a brand new document (no ID → repository assigns one)
 
-	if err := u.repo.Create(ctx, updatedLicense); err != nil {
+		if err := u.repo.Create(ctx, updatedLicense); err != nil {
 		return nil, err
 	}
 
 	return updatedLicense, nil
+}
+
+// GetByReferenceNumber returns every edition (version) stored for a given
+// reference number. The user may pass either a base ref ("REF_4") or a
+// versioned one ("REF_4.2") — either way it's normalized down to the base
+// ref before querying, so all related editions are returned.
+func (u *miningLicenseUsecase) GetByReferenceNumber(ctx context.Context, refNumber string, page int, limit int) (*domain.PaginatedMiningLicenseSummaries, error) {
+	if refNumber == "" {
+		return nil, errors.New("reference number is required")
+	}
+
+	baseRef := refNumber
+	if parts := strings.Split(baseRef, "."); len(parts) >= 2 {
+		baseRef = parts[0]
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+
+	return u.repo.GetByBaseReferenceNumber(ctx, baseRef, page, limit)
 }

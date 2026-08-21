@@ -133,6 +133,29 @@ type PaginatedMiningLicenses struct {
 	TotalPages int                          `json:"totalPages"`
 }
 
+// MiningLicenseSummary is a slim projection of MechanizedGemMiningLicense
+// used for listing every edition (version) of a given base reference number.
+type MiningLicenseSummary struct {
+	ID               primitive.ObjectID `json:"id" bson:"_id"`
+	ReferenceNumber  string             `json:"referenceNumber" bson:"referenceNumber"`
+	ApplicantName    string             `json:"applicantName" bson:"applicantName"`
+	PrivateSaleValue *string            `json:"privateSaleValue" bson:"privateSaleValue"`
+	CreatedBy        string             `json:"createdBy" bson:"createdBy"`
+	CreatedAt        time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt        time.Time          `json:"updatedAt" bson:"updatedAt"`
+	Status           string             `json:"status" bson:"status"`
+}
+
+// PaginatedMiningLicenseSummaries represents a paginated list of license
+// summaries, all sharing the same base reference number.
+type PaginatedMiningLicenseSummaries struct {
+	Data       []MiningLicenseSummary `json:"data"`
+	Total      int64                  `json:"total"`
+	Page       int                    `json:"page"`
+	Limit      int                    `json:"limit"`
+	TotalPages int                    `json:"totalPages"`
+}
+
 // MiningLicenseRepository defines DB operations for mining license applications
 type MiningLicenseRepository interface {
 	Create(ctx context.Context, license *MechanizedGemMiningLicense) error
@@ -145,6 +168,9 @@ type MiningLicenseRepository interface {
 	// GetMaxVersionByBaseRef returns the highest version suffix (e.g. 2 for "REF_2.2") stored
 	// for the given base reference number (e.g. "REF_2"). Returns 0 if none exist yet.
 	GetMaxVersionByBaseRef(ctx context.Context, baseRef string) (int, error)
+	// GetByBaseReferenceNumber returns a slim, paginated view of every edition
+	// (base ref + all its versioned suffixes) for a given base reference number.
+	GetByBaseReferenceNumber(ctx context.Context, baseRef string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
 }
 
 // MiningLicenseUsecase defines business logic for mining license applications
@@ -156,4 +182,7 @@ type MiningLicenseUsecase interface {
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	Edit(ctx context.Context, id string, updatedLicense *MechanizedGemMiningLicense) (*MechanizedGemMiningLicense, error)
+	// GetByReferenceNumber returns every edition of a license sharing the
+	// same base reference number (e.g. "REF_4" -> REF_4, REF_4.1, REF_4.2 ...).
+	GetByReferenceNumber(ctx context.Context, refNumber string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
 }

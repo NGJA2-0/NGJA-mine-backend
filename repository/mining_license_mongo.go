@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"regexp"
 
 	"math"
 	"sort"
@@ -302,11 +303,89 @@ func (r *miningLicenseMongoRepo) GetMaxVersionByBaseRef(ctx context.Context, bas
 		if strings.Contains(after, ".") {
 			continue
 		}
-		if v, err := strconv.Atoi(after); err == nil && v > maxVersion {
+				if v, err := strconv.Atoi(after); err == nil && v > maxVersion {
 			maxVersion = v
 		}
 	}
 
 	return maxVersion, cursor.Err()
+}
+
+// GetByBaseReferenceNumber returns a slim, paginated view of every edition
+// (the base ref itself plus any "<baseRef>.N" versions) for a given base
+// reference number, sorted by version ascending (base ref first, then .1, .2...).
+// Only the fields required by MiningLicenseSummary are fetched from Mongo.
+func (r *miningLicenseMongoRepo) GetByBaseReferenceNumber(ctx context.Context, baseRef string, page int, limit int) (*domain.PaginatedMiningLicenseSummaries, error) {
+	// Matches exactly "REF_4" or "REF_4.<anything>", but not "REF_40".
+	pattern := "^" + regexp.QuoteMeta(baseRef) + "($|\\.)"
+	filter := bson.M{
+		"referenceNumber": bson.M{"$regex": pattern},
+	}
+
+	projection := bson.M{
+		"_id":              1,
+		"referenceNumber":  1,
+		"applicantName":    1,
+		"privateSaleValue": 1,
+		"createdBy":        1,
+		"createdAt":        1,
+		"updatedAt":        1,
+		"status":           1,
+	}
+	findOptions := options.Find().SetProjection(projection)
+
+	cursor, err := r.collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var all []domain.MiningLicenseSummary
+	if err = cursor.All(ctx, &all); err != nil {
+		return nil, err
+	}
+
+	// Sort by version ascending: base ref (version 0) first, then .1, .2, ...
+	sort.Slice(all, func(i, j int) bool {
+		return summaryVersion(all[i].ReferenceNumber) < summaryVersion(all[j].ReferenceNumber)
+	})
+
+	total := int64(len(all))
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	skip := (page - 1) * limit
+	if skip > len(all) {
+		skip = len(all)
+	}
+	end := skip + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	pageItems := all[skip:end]
+	if pageItems == nil {
+		pageItems = []domain.MiningLicenseSummary{}
+	}
+
+	return &domain.PaginatedMiningLicenseSummaries{
+		Data:       pageItems,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
+}
+
+// summaryVersion extracts the numeric version suffix from a reference number,
+// e.g. "REF_4" -> 0, "REF_4.1" -> 1, "REF_4.12" -> 12.
+func summaryVersion(referenceNumber string) int {
+	idx := strings.Index(referenceNumber, ".")
+	if idx == -1 {
+		return 0
+	}
+	v, err := strconv.Atoi(referenceNumber[idx+1:])
+	if err != nil {
+		return 0
+	}
+	return v
 }
 

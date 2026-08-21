@@ -79,6 +79,13 @@ type MechanizedGemMiningLicense struct {
 	ConditionBreachDetails string `json:"conditionBreachDetails,omitempty" bson:"conditionBreachDetails,omitempty"`
 	OwnershipComplaint    string `json:"ownershipComplaint,omitempty" bson:"ownershipComplaint,omitempty"` // "yes" | "no"
 	ComplaintDetails      string `json:"complaintDetails,omitempty" bson:"complaintDetails,omitempty"`
+	ExistingPitsArea       string `json:"existingPitsArea,omitempty" bson:"existingPitsArea,omitempty"`
+	MudPitsArea            string `json:"mudPitsArea,omitempty" bson:"mudPitsArea,omitempty"`
+	DepthSize              string `json:"depthSize,omitempty" bson:"depthSize,omitempty"`
+	BreachesInLast3Months  string `json:"breachesInLast3Months,omitempty" bson:"breachesInLast3Months,omitempty"`
+	ReportsSubmitted       string `json:"reportsSubmitted,omitempty" bson:"reportsSubmitted,omitempty"` // "yes" | "no"
+	PrivateSaleValue       string `json:"privateSaleValue,omitempty" bson:"privateSaleValue,omitempty"`
+	AuctionSaleValue       string `json:"auctionSaleValue,omitempty" bson:"auctionSaleValue,omitempty"`
 
 	// Mining proposal
 	ProposedDepth   *float64 `json:"proposedDepth,omitempty" bson:"proposedDepth,omitempty"`
@@ -104,12 +111,13 @@ type MechanizedGemMiningLicense struct {
 	BackhoeCount             string `json:"backhoeCount,omitempty" bson:"backhoeCount,omitempty"`
 	GerumCount               string `json:"gerumCount,omitempty" bson:"gerumCount,omitempty"`
 
-	// Deprecated: The following fields are no longer required and have been removed from the frontend.
-	// AdumMachineCount         string `json:"-" bson:"-"`
-	// SilageExtent             string `json:"-" bson:"-"`
-	// DepositAmount            string `json:"-" bson:"-"`
-	// RiverbankProtectionAmount string `json:"-" bson:"-"`
-	// SpecialCaseAmount        string `json:"-" bson:"-"`
+	// Deprecated: no longer editable from the frontend, but kept so older documents
+	// that still have these values return them correctly in API responses.
+	AdumMachineCount          string `json:"adumMachineCount,omitempty" bson:"adumMachineCount,omitempty"`
+	SilageExtent              string `json:"silageExtent,omitempty" bson:"silageExtent,omitempty"`
+	DepositAmount             string `json:"depositAmount,omitempty" bson:"depositAmount,omitempty"`
+	RiverbankProtectionAmount string `json:"riverbankProtectionAmount,omitempty" bson:"riverbankProtectionAmount,omitempty"`
+	SpecialCaseAmount         string `json:"specialCaseAmount,omitempty" bson:"specialCaseAmount,omitempty"`
 
 	// Metadata
 	CreatedBy string `json:"createdBy,omitempty" bson:"createdBy,omitempty"`

@@ -34,14 +34,17 @@ func main() {
 	// Setup Repositories
 	userRepo := repository.NewUserRepository(db)
 	miningLicenseRepo := repository.NewMiningLicenseRepository(db)
+	extendMiningLicenseRepo := repository.NewExtendMiningLicenseRepository(db)
 
 	// Setup Usecases
 	userUsecase := usecase.NewUserUsecase(userRepo, env.JWTSecret)
 	miningLicenseUsecase := usecase.NewMiningLicenseUsecase(miningLicenseRepo)
+	extendMiningLicenseUsecase := usecase.NewExtendMiningLicenseUsecase(extendMiningLicenseRepo)
 
 	// Setup Handlers (Routes)
 	httpHandler.NewUserHandler(app, userUsecase)
 	httpHandler.NewMiningLicenseHandler(app, miningLicenseUsecase, userUsecase, env.JWTSecret)
+	httpHandler.NewExtendMiningLicenseHandler(app, extendMiningLicenseUsecase, userUsecase, env.JWTSecret)
 
 	// Root GET Route
 	app.Get("/", func(c *fiber.Ctx) error {

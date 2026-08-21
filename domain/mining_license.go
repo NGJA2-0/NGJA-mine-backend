@@ -79,6 +79,13 @@ type MechanizedGemMiningLicense struct {
 	ConditionBreachDetails string `json:"conditionBreachDetails,omitempty" bson:"conditionBreachDetails,omitempty"`
 	OwnershipComplaint    string `json:"ownershipComplaint,omitempty" bson:"ownershipComplaint,omitempty"` // "yes" | "no"
 	ComplaintDetails      string `json:"complaintDetails,omitempty" bson:"complaintDetails,omitempty"`
+	ExistingPitsArea       string `json:"existingPitsArea,omitempty" bson:"existingPitsArea,omitempty"`
+	MudPitsArea            string `json:"mudPitsArea,omitempty" bson:"mudPitsArea,omitempty"`
+	DepthSize              string `json:"depthSize,omitempty" bson:"depthSize,omitempty"`
+	BreachesInLast3Months  string `json:"breachesInLast3Months,omitempty" bson:"breachesInLast3Months,omitempty"`
+	ReportsSubmitted       string `json:"reportsSubmitted,omitempty" bson:"reportsSubmitted,omitempty"` // "yes" | "no"
+	PrivateSaleValue       string `json:"privateSaleValue,omitempty" bson:"privateSaleValue,omitempty"`
+	AuctionSaleValue       string `json:"auctionSaleValue,omitempty" bson:"auctionSaleValue,omitempty"`
 
 	// Mining proposal
 	ProposedDepth   *float64 `json:"proposedDepth,omitempty" bson:"proposedDepth,omitempty"`
@@ -103,11 +110,14 @@ type MechanizedGemMiningLicense struct {
 	MaxPcCount               string `json:"maxPcCount,omitempty" bson:"maxPcCount,omitempty"`
 	BackhoeCount             string `json:"backhoeCount,omitempty" bson:"backhoeCount,omitempty"`
 	GerumCount               string `json:"gerumCount,omitempty" bson:"gerumCount,omitempty"`
-	AdumMachineCount         string `json:"adumMachineCount,omitempty" bson:"adumMachineCount,omitempty"`
-	SilageExtent             string `json:"silageExtent,omitempty" bson:"silageExtent,omitempty"`
-	DepositAmount            string `json:"depositAmount,omitempty" bson:"depositAmount,omitempty"`
+
+	// Deprecated: no longer editable from the frontend, but kept so older documents
+	// that still have these values return them correctly in API responses.
+	AdumMachineCount          string `json:"adumMachineCount,omitempty" bson:"adumMachineCount,omitempty"`
+	SilageExtent              string `json:"silageExtent,omitempty" bson:"silageExtent,omitempty"`
+	DepositAmount             string `json:"depositAmount,omitempty" bson:"depositAmount,omitempty"`
 	RiverbankProtectionAmount string `json:"riverbankProtectionAmount,omitempty" bson:"riverbankProtectionAmount,omitempty"`
-	SpecialCaseAmount        string `json:"specialCaseAmount,omitempty" bson:"specialCaseAmount,omitempty"`
+	SpecialCaseAmount         string `json:"specialCaseAmount,omitempty" bson:"specialCaseAmount,omitempty"`
 
 	// Metadata
 	CreatedBy string `json:"createdBy,omitempty" bson:"createdBy,omitempty"`
@@ -123,6 +133,29 @@ type PaginatedMiningLicenses struct {
 	TotalPages int                          `json:"totalPages"`
 }
 
+// MiningLicenseSummary is a slim projection of MechanizedGemMiningLicense
+// used for listing every edition (version) of a given base reference number.
+type MiningLicenseSummary struct {
+	ID               primitive.ObjectID `json:"id" bson:"_id"`
+	ReferenceNumber  string             `json:"referenceNumber" bson:"referenceNumber"`
+	ApplicantName    string             `json:"applicantName" bson:"applicantName"`
+	PrivateSaleValue *string            `json:"privateSaleValue" bson:"privateSaleValue"`
+	CreatedBy        string             `json:"createdBy" bson:"createdBy"`
+	CreatedAt        time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt        time.Time          `json:"updatedAt" bson:"updatedAt"`
+	Status           string             `json:"status" bson:"status"`
+}
+
+// PaginatedMiningLicenseSummaries represents a paginated list of license
+// summaries, all sharing the same base reference number.
+type PaginatedMiningLicenseSummaries struct {
+	Data       []MiningLicenseSummary `json:"data"`
+	Total      int64                  `json:"total"`
+	Page       int                    `json:"page"`
+	Limit      int                    `json:"limit"`
+	TotalPages int                    `json:"totalPages"`
+}
+
 // MiningLicenseRepository defines DB operations for mining license applications
 type MiningLicenseRepository interface {
 	Create(ctx context.Context, license *MechanizedGemMiningLicense) error
@@ -132,6 +165,12 @@ type MiningLicenseRepository interface {
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	GetNextBaseReferenceNumber(ctx context.Context) (int64, error)
+	// GetMaxVersionByBaseRef returns the highest version suffix (e.g. 2 for "REF_2.2") stored
+	// for the given base reference number (e.g. "REF_2"). Returns 0 if none exist yet.
+	GetMaxVersionByBaseRef(ctx context.Context, baseRef string) (int, error)
+	// GetByBaseReferenceNumber returns a slim, paginated view of every edition
+	// (base ref + all its versioned suffixes) for a given base reference number.
+	GetByBaseReferenceNumber(ctx context.Context, baseRef string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
 }
 
 // MiningLicenseUsecase defines business logic for mining license applications
@@ -143,4 +182,7 @@ type MiningLicenseUsecase interface {
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	Edit(ctx context.Context, id string, updatedLicense *MechanizedGemMiningLicense) (*MechanizedGemMiningLicense, error)
+	// GetByReferenceNumber returns every edition of a license sharing the
+	// same base reference number (e.g. "REF_4" -> REF_4, REF_4.1, REF_4.2 ...).
+	GetByReferenceNumber(ctx context.Context, refNumber string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
 }

@@ -26,6 +26,7 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Get("/", auth, handler.GetAll)
 	api.Get("/tin/:tin", auth, handler.GetByTIN)
 	api.Get("/map", auth, handler.GetForMap) 
+	api.Get("/reference/:refNumber", auth, handler.GetByReferenceNumber)
 	api.Get("/:id", auth, handler.GetByID)
 	api.Post("/:id/edit", auth, handler.Edit)
 	api.Patch("/:id/status", auth, handler.UpdateStatus)
@@ -253,8 +254,39 @@ func (h *MiningLicenseHandler) Edit(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "License application edited successfully",
+		"data":    result,
+	})
+}
+
+// GetByReferenceNumber godoc
+// GET /api/mining-licenses/reference/:refNumber
+// Returns every edition (version) sharing the same base reference number,
+// e.g. refNumber "REF_4" returns REF_4, REF_4.1, REF_4.2, etc.
+// Supports pagination via ?page= and ?limit= (default page=1, limit=10).
+// Only returns a slim projection: id, referenceNumber, applicantName,
+// privateSaleValue, createdBy, createdAt, updatedAt, status.
+func (h *MiningLicenseHandler) GetByReferenceNumber(c *fiber.Ctx) error {
+	refNumber := c.Params("refNumber")
+	if refNumber == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Reference number is required",
+		})
+	}
+
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+
+	result, err := h.Usecase.GetByReferenceNumber(c.Context(), refNumber, page, limit)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "License editions retrieved successfully",
 		"data":    result,
 	})
 }

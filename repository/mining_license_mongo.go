@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -73,46 +74,103 @@ func (r *miningLicenseMongoRepo) GetAll(ctx context.Context) ([]domain.Mechanize
 	return licenses, nil
 }
 
-// GetByTIN returns all license applications for a specific TIN number.
+// GetByTIN returns license applications for a specific TIN number, deduplicated
+// so that only the latest edition per base reference number is returned
+// (e.g. REF_2.1, REF_2.2 -> only REF_2.2 is returned; REF_5 with no suffix
+// counts as version 0 and is returned as-is if it's the only edition).
+// Results are sorted by base reference number descending (newest ref first),
+// and pagination is applied to the deduplicated set.
 func (r *miningLicenseMongoRepo) GetByTIN(ctx context.Context, tin string, page int, limit int) (*domain.PaginatedMiningLicenses, error) {
 	filter := bson.M{"tin": tin}
-	
-	// Get total count
-	total, err := r.collection.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
 
-	// Calculate skip and total pages
-	skip := (page - 1) * limit
-	totalPages := int(math.Ceil(float64(total) / float64(limit)))
-
-	// Setup options
-	findOptions := options.Find()
-	findOptions.SetSkip(int64(skip))
-	findOptions.SetLimit(int64(limit))
-
-	cursor, err := r.collection.Find(ctx, filter, findOptions)
+	// Fetch everything for this TIN first — we can't paginate at the DB level
+	// because dedup has to happen across the full result set.
+	cursor, err := r.collection.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var licenses []domain.MechanizedGemMiningLicense
-	if err = cursor.All(ctx, &licenses); err != nil {
+	var all []domain.MechanizedGemMiningLicense
+	if err = cursor.All(ctx, &all); err != nil {
 		return nil, err
 	}
-	if licenses == nil {
-		licenses = []domain.MechanizedGemMiningLicense{}
+
+	// Keep only the highest version per base reference number.
+	type latestEntry struct {
+		license domain.MechanizedGemMiningLicense
+		version int
 	}
-	
+	latestByBaseRef := make(map[string]latestEntry)
+
+	for _, lic := range all {
+		baseRef := lic.ReferenceNumber
+		version := 0
+		if idx := strings.Index(lic.ReferenceNumber, "."); idx != -1 {
+			baseRef = lic.ReferenceNumber[:idx]
+			if v, err := strconv.Atoi(lic.ReferenceNumber[idx+1:]); err == nil {
+				version = v
+			}
+		}
+
+		if existing, ok := latestByBaseRef[baseRef]; !ok || version > existing.version {
+			latestByBaseRef[baseRef] = latestEntry{license: lic, version: version}
+		}
+	}
+
+	deduped := make([]domain.MechanizedGemMiningLicense, 0, len(latestByBaseRef))
+	for _, entry := range latestByBaseRef {
+		deduped = append(deduped, entry.license)
+	}
+
+	// Sort by base reference number, newest (highest numeric value) first.
+	sort.Slice(deduped, func(i, j int) bool {
+		return baseRefNumber(deduped[i].ReferenceNumber) > baseRefNumber(deduped[j].ReferenceNumber)
+	})
+
+	// Paginate the deduplicated, sorted slice in-memory.
+	total := int64(len(deduped))
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	skip := (page - 1) * limit
+	if skip > len(deduped) {
+		skip = len(deduped)
+	}
+	end := skip + limit
+	if end > len(deduped) {
+		end = len(deduped)
+	}
+	pageItems := deduped[skip:end]
+	if pageItems == nil {
+		pageItems = []domain.MechanizedGemMiningLicense{}
+	}
+
 	return &domain.PaginatedMiningLicenses{
-		Data:       licenses,
+		Data:       pageItems,
 		Total:      total,
 		Page:       page,
 		Limit:      limit,
 		TotalPages: totalPages,
 	}, nil
+}
+
+// baseRefNumber extracts the numeric part of a base reference number,
+// e.g. "REF_9" -> 9, "REF_2.1" -> 2. Returns -1 if it can't be parsed,
+// so unparsable refs sort last.
+func baseRefNumber(referenceNumber string) int {
+	baseRef := referenceNumber
+	if idx := strings.Index(referenceNumber, "."); idx != -1 {
+		baseRef = referenceNumber[:idx]
+	}
+	parts := strings.Split(baseRef, "_")
+	if len(parts) < 2 {
+		return -1
+	}
+	n, err := strconv.Atoi(parts[len(parts)-1])
+	if err != nil {
+		return -1
+	}
+	return n
 }
 
 // GetForMap returns license applications matching the given filters,

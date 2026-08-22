@@ -57,6 +57,37 @@ func (r *miningLicenseMongoRepo) GetByID(ctx context.Context, id string) (*domai
 	return &license, nil
 }
 
+// GetRawByID fetches a single license as a raw bson.M map by its ObjectID.
+func (r *miningLicenseMongoRepo) GetRawByID(ctx context.Context, id string) (primitive.M, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, errors.New("invalid license ID format")
+	}
+
+	var raw primitive.M
+	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&raw)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, errors.New("license not found")
+		}
+		return nil, err
+	}
+	return raw, nil
+}
+
+// GetRawByReferenceNumber fetches a single license as a raw bson.M map by its exact referenceNumber.
+func (r *miningLicenseMongoRepo) GetRawByReferenceNumber(ctx context.Context, ref string) (primitive.M, error) {
+	var raw primitive.M
+	err := r.collection.FindOne(ctx, bson.M{"referenceNumber": ref}).Decode(&raw)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, errors.New("license not found")
+		}
+		return nil, err
+	}
+	return raw, nil
+}
+
 // GetAll returns every license application document in the collection.
 func (r *miningLicenseMongoRepo) GetAll(ctx context.Context) ([]domain.MechanizedGemMiningLicense, error) {
 	cursor, err := r.collection.Find(ctx, bson.M{})

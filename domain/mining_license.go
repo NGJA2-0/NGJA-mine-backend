@@ -156,10 +156,24 @@ type PaginatedMiningLicenseSummaries struct {
 	TotalPages int                    `json:"totalPages"`
 }
 
+// FieldChange represents a single changed field between versions
+type FieldChange struct {
+	Old interface{} `json:"old"`
+	New interface{} `json:"new"`
+}
+
+// CompareResult represents the diff between two versions
+type CompareResult struct {
+	Message string                 `json:"message,omitempty"`
+	Changes map[string]FieldChange `json:"changes"`
+}
+
 // MiningLicenseRepository defines DB operations for mining license applications
 type MiningLicenseRepository interface {
 	Create(ctx context.Context, license *MechanizedGemMiningLicense) error
 	GetByID(ctx context.Context, id string) (*MechanizedGemMiningLicense, error)
+	GetRawByID(ctx context.Context, id string) (primitive.M, error)
+	GetRawByReferenceNumber(ctx context.Context, ref string) (primitive.M, error)
 	GetAll(ctx context.Context) ([]MechanizedGemMiningLicense, error)
 	GetByTIN(ctx context.Context, tin string, page int, limit int) (*PaginatedMiningLicenses, error)
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
@@ -182,6 +196,7 @@ type MiningLicenseUsecase interface {
 	GetForMap(ctx context.Context, filters MapFilters) ([]MechanizedGemMiningLicense, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	Edit(ctx context.Context, id string, updatedLicense *MechanizedGemMiningLicense) (*MechanizedGemMiningLicense, error)
+	CompareVersions(ctx context.Context, id string) (*CompareResult, error)
 	// GetByReferenceNumber returns every edition of a license sharing the
 	// same base reference number (e.g. "REF_4" -> REF_4, REF_4.1, REF_4.2 ...).
 	GetByReferenceNumber(ctx context.Context, refNumber string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)

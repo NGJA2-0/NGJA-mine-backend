@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -244,4 +246,86 @@ func (u *miningLicenseUsecase) GetByReferenceNumber(ctx context.Context, refNumb
 	}
 
 	return u.repo.GetByBaseReferenceNumber(ctx, baseRef, page, limit)
+}
+
+// CompareVersions compares a specific license version against its immediate predecessor.
+func (u *miningLicenseUsecase) CompareVersions(ctx context.Context, id string) (*domain.CompareResult, error) {
+	// 1. Fetch current raw doc
+	currDoc, err := u.repo.GetRawByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch license: %w", err)
+	}
+
+	// 2. Determine referenceNumber
+	refVal, ok := currDoc["referenceNumber"].(string)
+	if !ok || refVal == "" {
+		return nil, errors.New("record does not have a valid reference number")
+	}
+
+	// 3. Determine previous referenceNumber
+	parts := strings.Split(refVal, ".")
+	if len(parts) == 1 {
+		return nil, errors.New("No previous version exists to compare")
+	}
+
+	baseRef := parts[0]
+	version, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, errors.New("invalid version format in reference number")
+	}
+
+	var prevRef string
+	if version == 1 {
+		prevRef = baseRef
+	} else {
+		prevRef = fmt.Sprintf("%s.%d", baseRef, version-1)
+	}
+
+	// 4. Fetch previous raw doc
+	prevDoc, err := u.repo.GetRawByReferenceNumber(ctx, prevRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch previous version (%s): %w", prevRef, err)
+	}
+
+	// 5. Compare fields
+	changes := make(map[string]domain.FieldChange)
+	isExtended := false
+
+	// Compare curr against prev
+	for k, vCurr := range currDoc {
+		if k == "_id" || k == "createdAt" || k == "updatedAt" {
+			continue
+		}
+		vPrev, exists := prevDoc[k]
+		if !exists || !reflect.DeepEqual(vCurr, vPrev) {
+			changes[k] = domain.FieldChange{Old: vPrev, New: vCurr}
+			if k == "privateSaleValue" || k == "auctionSaleValue" {
+				isExtended = true
+			}
+		}
+	}
+
+	// Check fields removed in curr
+	for k, vPrev := range prevDoc {
+		if k == "_id" || k == "createdAt" || k == "updatedAt" {
+			continue
+		}
+		if _, exists := currDoc[k]; !exists {
+			changes[k] = domain.FieldChange{Old: vPrev, New: nil}
+			if k == "privateSaleValue" || k == "auctionSaleValue" {
+				isExtended = true
+			}
+		}
+	}
+
+	result := &domain.CompareResult{
+		Changes: changes,
+	}
+	if isExtended {
+		result.Message = "The record was extended"
+	} else {
+		result.Message = "Comparison successful"
+	}
+
+	return result, nil
 }

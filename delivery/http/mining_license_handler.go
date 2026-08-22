@@ -28,6 +28,7 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Get("/map", auth, handler.GetForMap) 
 	api.Get("/reference/:refNumber", auth, handler.GetByReferenceNumber)
 	api.Get("/:id", auth, handler.GetByID)
+	api.Get("/:id/compare", auth, handler.CompareWithPrevious)
 	api.Post("/:id/edit", auth, handler.Edit)
 	api.Patch("/:id/status", auth, handler.UpdateStatus)
 }
@@ -289,4 +290,30 @@ func (h *MiningLicenseHandler) GetByReferenceNumber(c *fiber.Ctx) error {
 		"message": "License editions retrieved successfully",
 		"data":    result,
 	})
+}
+
+// CompareWithPrevious godoc
+// GET /api/mining-licenses/:id/compare
+// Compares the given license version with its immediate predecessor
+func (h *MiningLicenseHandler) CompareWithPrevious(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "License ID is required",
+		})
+	}
+
+	result, err := h.Usecase.CompareVersions(c.Context(), id)
+	if err != nil {
+		if err.Error() == "No previous version exists to compare" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(result)
 }

@@ -147,15 +147,16 @@ func (h *MiningLicenseHandler) GetByTIN(c *fiber.Ctx) error {
 		}
 
 		customData = append(customData, fiber.Map{
-			"id":            lic.ID,
-			"createdAt":     lic.CreatedAt,
-			"updatedAt":     lic.UpdatedAt,
-			"applicantName": lic.ApplicantName,
-			"tin":           lic.TIN,
-			"gmlNumber":     lic.GMLNumber,
-			"createdBy":     lic.CreatedBy,
-			"status":        lic.Status,
-			"type":          recordType,
+			"id":              lic.ID,
+			"createdAt":       lic.CreatedAt,
+			"updatedAt":       lic.UpdatedAt,
+			"referenceNumber": lic.ReferenceNumber,
+			"applicantName":   lic.ApplicantName,
+			"tin":             lic.TIN,
+			"gmlNumber":       lic.GMLNumber,
+			"createdBy":       lic.CreatedBy,
+			"status":          lic.Status,
+			"type":            recordType,
 		})
 	}
 

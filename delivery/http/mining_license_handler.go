@@ -139,9 +139,41 @@ func (h *MiningLicenseHandler) GetByTIN(c *fiber.Ctx) error {
 		})
 	}
 
+	var customData []fiber.Map
+	for _, lic := range paginatedLicenses.Data {
+		recordType := "new"
+		if lic.PrivateSaleValue != "" || lic.AuctionSaleValue != "" {
+			recordType = "extended"
+		}
+
+		customData = append(customData, fiber.Map{
+			"id":            lic.ID,
+			"createdAt":     lic.CreatedAt,
+			"updatedAt":     lic.UpdatedAt,
+			"applicantName": lic.ApplicantName,
+			"tin":           lic.TIN,
+			"gmlNumber":     lic.GMLNumber,
+			"createdBy":     lic.CreatedBy,
+			"status":        lic.Status,
+			"type":          recordType,
+		})
+	}
+
+	if customData == nil {
+		customData = []fiber.Map{}
+	}
+
+	customPaginatedResponse := fiber.Map{
+		"data":       customData,
+		"total":      paginatedLicenses.Total,
+		"page":       paginatedLicenses.Page,
+		"limit":      paginatedLicenses.Limit,
+		"totalPages": paginatedLicenses.TotalPages,
+	}
+
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "License applications retrieved successfully",
-		"data":    paginatedLicenses,
+		"data":    customPaginatedResponse,
 	})
 }
 

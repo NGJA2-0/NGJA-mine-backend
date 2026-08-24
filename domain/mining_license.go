@@ -185,6 +185,8 @@ type MiningLicenseRepository interface {
 	// GetByBaseReferenceNumber returns a slim, paginated view of every edition
 	// (base ref + all its versioned suffixes) for a given base reference number.
 	GetByBaseReferenceNumber(ctx context.Context, baseRef string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
+	GetLatestByReferenceNumber(ctx context.Context, baseRef string) (*LatestMiningLicenseInfo, error)
+	GetAllLatest(ctx context.Context) ([]LatestMiningLicenseInfo, error)
 }
 
 // MiningLicenseUsecase defines business logic for mining license applications
@@ -200,4 +202,15 @@ type MiningLicenseUsecase interface {
 	// GetByReferenceNumber returns every edition of a license sharing the
 	// same base reference number (e.g. "REF_4" -> REF_4, REF_4.1, REF_4.2 ...).
 	GetByReferenceNumber(ctx context.Context, refNumber string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
+	GetLatestByReferenceNumber(ctx context.Context, baseRef string) (*LatestMiningLicenseInfo, error)
+	GetAllLatest(ctx context.Context) ([]LatestMiningLicenseInfo, error)
+}
+
+// LatestMiningLicenseInfo represents the required fields for the latest license.
+type LatestMiningLicenseInfo struct {
+	ID            primitive.ObjectID `json:"id" bson:"_id"`
+	Latitude      string             `json:"latitude"`
+	Longitude     string             `json:"longitude"`
+	ApplicantName string             `json:"applicantName"`
+	Status        string             `json:"status"`
 }

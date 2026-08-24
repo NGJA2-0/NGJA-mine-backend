@@ -329,3 +329,17 @@ func (u *miningLicenseUsecase) CompareVersions(ctx context.Context, id string) (
 
 	return result, nil
 }
+func (u *miningLicenseUsecase) GetLatestByReferenceNumber(ctx context.Context, baseRef string) (*domain.LatestMiningLicenseInfo, error) {
+	if baseRef == "" {
+		return nil, errors.New("reference number is required")
+	}
+	
+	if parts := strings.Split(baseRef, "."); len(parts) >= 2 {
+		baseRef = parts[0]
+	}
+
+	return u.repo.GetLatestByReferenceNumber(ctx, baseRef)
+}
+func (u *miningLicenseUsecase) GetAllLatest(ctx context.Context) ([]domain.LatestMiningLicenseInfo, error) {
+	return u.repo.GetAllLatest(ctx)
+}

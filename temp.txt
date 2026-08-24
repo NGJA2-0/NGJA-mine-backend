@@ -1,0 +1,5 @@
+func (r *miningLicenseMongoRepo) GetAllLatest(ctx context.Context) ([]domain.LatestMiningLicenseInfo, error) {
+	// Let's use an aggregation pipeline, or fetch all and filter in memory.
+	// Since it's MongoDB, aggregation might be trickier to write perfectly in one go without testing,
+	// but let's try an aggregation if possible, or just fetch all and group in Go.
+	// Given the size, fetching all might be okay, but aggregation is better.

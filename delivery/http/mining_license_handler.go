@@ -27,6 +27,7 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Get("/tin/:tin", auth, handler.GetByTIN)
 	api.Get("/map", auth, handler.GetForMap) 
 	api.Get("/reference/:refNumber", auth, handler.GetByReferenceNumber)
+	api.Get("/latest", auth, handler.GetAllLatest)
 	api.Get("/:id", auth, handler.GetByID)
 	api.Get("/:id/compare", auth, handler.CompareWithPrevious)
 	api.Post("/:id/edit", auth, handler.Edit)
@@ -349,4 +350,14 @@ func (h *MiningLicenseHandler) CompareWithPrevious(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(result)
+}
+// GetAllLatest godoc
+// GET /api/mining-licenses/latest
+func (h *MiningLicenseHandler) GetAllLatest(c *fiber.Ctx) error {
+	res, err := h.Usecase.GetAllLatest(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(res)
 }

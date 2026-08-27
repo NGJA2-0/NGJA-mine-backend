@@ -28,6 +28,9 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Get("/map", auth, handler.GetForMap) 
 	api.Get("/reference/:refNumber", auth, handler.GetByReferenceNumber)
 	api.Get("/latest", auth, handler.GetAllLatest)
+	api.Get("/districts", auth, handler.GetLatestDistricts)
+	api.Get("/regional-offices", auth, handler.GetLatestRegionalOffices)
+	api.Get("/filter", auth, handler.GetLatestFiltered)
 	api.Get("/:id", auth, handler.GetByID)
 	api.Get("/:id/compare", auth, handler.CompareWithPrevious)
 	api.Post("/:id/edit", auth, handler.Edit)
@@ -360,4 +363,65 @@ func (h *MiningLicenseHandler) GetAllLatest(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(res)
+}
+
+// GetLatestDistricts godoc
+// GET /api/mining-licenses/districts
+// Returns the distinct districts present among the latest edition of every
+// application (DB values only — the hardcoded DS division list is never
+// returned directly).
+func (h *MiningLicenseHandler) GetLatestDistricts(c *fiber.Ctx) error {
+	districts, err := h.Usecase.GetLatestDistricts(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Districts retrieved successfully",
+		"data":    districts,
+	})
+}
+
+// GetLatestRegionalOffices godoc
+// GET /api/mining-licenses/regional-offices?district=X
+// Returns the distinct regional offices for the given district, present
+// among the latest edition of every application in that district.
+func (h *MiningLicenseHandler) GetLatestRegionalOffices(c *fiber.Ctx) error {
+	district := c.Query("district")
+	if district == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "district query param is required",
+		})
+	}
+
+	offices, err := h.Usecase.GetLatestRegionalOffices(c.Context(), district)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Regional offices retrieved successfully",
+		"data":    offices,
+	})
+}
+
+// GetLatestFiltered godoc
+// GET /api/mining-licenses/filter?district=X&regionalOffice=Y
+// Returns the latest edition of every application matching both filters,
+// projected to a slim result set.
+func (h *MiningLicenseHandler) GetLatestFiltered(c *fiber.Ctx) error {
+	district := c.Query("district")
+	regionalOffice := c.Query("regionalOffice")
+	if district == "" || regionalOffice == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "district and regionalOffice query params are required",
+		})
+	}
+
+	results, err := h.Usecase.GetLatestFiltered(c.Context(), district, regionalOffice)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Filtered license applications retrieved successfully",
+		"data":    results,
+	})
 }

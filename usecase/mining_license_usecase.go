@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -342,4 +343,126 @@ func (u *miningLicenseUsecase) GetLatestByReferenceNumber(ctx context.Context, b
 }
 func (u *miningLicenseUsecase) GetAllLatest(ctx context.Context) ([]domain.LatestMiningLicenseInfo, error) {
 	return u.repo.GetAllLatest(ctx)
+}
+
+// dsDivisionsByDistrict is the hardcoded canonical list of DS divisions
+// per district. It's used only to sanity-check which regionalOffice values
+// are legitimate for a given district — it is NEVER returned directly as
+// dropdown data. Dropdown options always come from what actually exists
+// in the DB (see GetLatestRegionalOffices below).
+var dsDivisionsByDistrict = map[string][]string{
+	"කොළඹ":         {"කොළඹ", "තිඹිරිගස්යාය", "කොලොන්නාව", "කඩුවෙල", "කැස්බෑව", "මහරගම", "හෝමාගම", "ශ්‍රී ජයවර්ධනපුර කෝට්ටේ", "දෙහිවල-ගල්කිස්ස", "මොරටුව", "පාදුක්ක", "සීතාවක", "රත්මලාන"},
+	"ගම්පහ":        {"ගම්පහ", "මීගමුව", "ජා-ඇල", "වත්තල", "කටාන", "දිවුලපිටිය", "මිරිගම", "මිනුවන්ගොඩ", "අත්තනගල්ල", "දොම්පේ", "බියගම", "කැලණිය", "මහර"},
+	"කළුතර":        {"කළුතර", "බේරුවල", "පානදුර", "බණ්ඩාරගම", "හෝරණ", "බුලත්සිංහල", "මිල්ලනිය", "පැලින්දනුවර", "අගලවත්ත", "මතුගම", "වලල්ලාවිට", "ඉංගිරිය", "දොඩංගොඩ", "මදුරාවෙල"},
+	"මහනුවර":       {"මහනුවර හතරගම් කෝරළය", "ගඟවට කෝරළය", "පාතදුම්බර", "උඩුනුවර", "යටිනුවර", "හාරිස්පත්තුව", "උඩපළාත", "අකුරණ", "දොළුව", "පන්විල", "මිනිපේ", "මැදදුම්බර", "හතරලියද්ද", "දෙල්තොට", "කුණ්ඩසාලේ", "තුම්පනේ", "පතහේවහෙට", "ගඟ ඉහළ කෝරළය", "පූජාපිටිය", "වත්තේගම"},
+	"මාතලේ":        {"මාතලේ", "රත්තොට", "උකුවෙල", "පල්ලේපොල", "යටවත්ත", "නාඑල", "ගලේවෙල", "දඹුල්ල", "විල්ගමුව", "අඹන්ගඟ කෝරළය", "ලග්ගල-පල්ලේගම"},
+	"නුවරඑළිය":     {"නුවරඑළිය", "හඟුරන්කෙත", "වලපනේ", "කොත්මලේ", "අඹගමුව"},
+	"ගාල්ල":        {"ගාල්ල හතරගම් කෝරළය", "බෝප-පොද්දල", "අක්මීමන", "යක්කලමුල්ල", "බද්දේගම", "එල්පිටිය", "නාගොඩ", "නෙළුව", "තවලම", "බෙන්තොට", "බලපිටිය", "අම්බලන්ගොඩ", "කරන්දෙණිය", "හබරාදුව", "ඉමදුව", "වැලිවිටිය-දිවිතුර", "හික්කඩුව", "ගොනාපිනුවල", "නියාගම"},
+	"මාතර":         {"මාතර හතරගම් කෝරළය", "දෙවිනුවර", "වැලිගම", "අකුරැස්ස", "කඹුරුපිටිය", "කොටපොල", "පස්ගොඩ", "පිටබැද්දර", "මාලිම්බඩ", "මුලටියන", "අතුරලිය", "හක්මන", "තිහගොඩ", "දික්වැල්ල", "කිරින්ද පුහුල්වැල්ල", "වැලිපිටිය"},
+	"හම්බන්තොට":    {"හම්බන්තොට", "තංගල්ල", "තිස්සමහාරාමය", "අම්බලන්තොට", "බෙලිඅත්ත", "වලස්මුල්ල", "වීරකැටිය", "අඟුණකොලපැලැස්ස", "සූරියවැව", "ලුණුගම්වෙහෙර", "කටුවන", "තණමල්විල"},
+	"යාපනය":        {"යාපනය", "නල්ලූර්", "කොපායි", "උඩුවිල්", "තෙල්ලිප්පලෙයි", "සන්දිලිප්පායි", "චාවකච්චේරිය", "පොයින්ට් පේද්‍රෝ", "කාරයිනගර්", "කයිට්ස්", "වේලනෛ", "ඩෙල්ෆ්ට්", "උතුරු වඩමාරච්චිය", "නැගෙනහිර වඩමාරච්චිය", "තෙන්මරච්චිය"},
+	"කිලිනොච්චිය":  {"කිලිනොච්චිය", "කරච්චි", "පච්චිලෛපල්ලි", "පූනාකරි"},
+	"මන්නාරම":      {"මන්නාරම නගරය", "බටහිර මන්තෙයි", "නානට්ටාන්", "මඩු", "මුසලි"},
+	"වවුනියාව":     {"වවුනියාව", "උතුරු වවුනියාව", "දකුණු වවුනියාව", "වෙන්ගලච්චෙට්ටිකුලම්"},
+	"මුලතිව්":      {"නැගෙනහිර මන්තෙයි", "මරිතයිම්පට්ටු", "ඔද්දුසුඩාන්", "පුතුක්කුඩියිරුප්පු", "තුනුක්කායි"},
+	"මඩකලපුව":      {"උතුරු මන්මුනෛ", "මන්මුනෛ පත්තු", "දකුණු මන්මුනෛ සහ එරුවිල් පත්තු", "බටහිර මන්මුනෛ", "නිරිතදිග මන්මුනෛ", "කෝරළෛ පත්තු", "උතුරු කෝරළෛ පත්තු", "දකුණු කෝරළෛ පත්තු", "බටහිර කෝරළෛ පත්තු", "මධ්‍යම කෝරළෛ පත්තු", "එරාවුර් පත්තු", "එරාවුර් නගරය", "පොරතිවු පත්තු", "කත්තන්කුඩි"},
+	"අම්පාර":       {"අම්පාර", "උහන", "දමන", "මහඔය", "පඩියතලාව", "දෙහිආටකන්දිය", "අද්දාලච්චේන", "අක්කරෙයිපත්තුව", "සයින්දමරුදු", "නින්තාවූර්", "කල්මුණේ", "කරෛතිවු", "සම්මන්තුරේ", "අලෙයාඩිවෙම්බු", "තිරුක්කෝවිල්", "පොත්තුවිල්", "ලාහුගල", "නාවිතන්වෙලි"},
+	"ත්‍රිකුණාමලය": {"ත්‍රිකුණාමලය නගරය සහ ග්‍රාවට්ස්", "කින්නියා", "මුතූර්", "කුච්චවේලි", "ගෝමරන්කඩවල", "මොරවැව", "තඹලගමුව", "කන්තලේ", "සේරුවිල", "පදවි ශ්‍රී පුර", "වේරුගල්"},
+	"කුරුණෑගල":     {"කුරුණෑගල", "මල්ලවපිටිය", "මාවතගම", "පොල්ගහවෙල", "වාරියපොල", "පන්නල", "රිදීගම", "ඉබ්බාගමුව", "අලව්ව", "බිංගිරිය", "නැගෙනහිර කුලියාපිටිය", "බටහිර කුලියාපිටිය", "බමුණකොටුව", "කටුපොත", "නැගෙනහිර පඬුවස්නුවර", "බටහිර පඬුවස්නුවර", "නිකවැරටිය", "මහව", "ගල්ගමුව", "ගනේවත්ත", "ගිරිබාව", "එහෙටුවෙව", "පොල්පිතිගම", "රස්නායකපුර", "වේරඹුගෙදර", "කොටවෙහෙර", "මාස්පොත", "නාරම්මල", "කොබෙයිගනේ", "අඹන්පොල"},
+	"පුත්තලම":      {"පුත්තලම", "කල්පිටිය", "වනාතවිල්ලුව", "කරුවලගස්වැව", "අනමඩුව", "නාත්තණ්ඩිය", "මුන්දලම", "චිලාව", "අරච්චිකට්ටුව", "මාදම්පේ", "වෙන්නප්පුව", "මහව්ව"},
+	"අනුරාධපුරය":   {"නුවරගම් පළාත නැගෙනහිර", "නුවරගම් පළාත මධ්‍යම", "කැකිරාව", "පලාගල", "තලාව", "මිහින්තලේ", "රඹෑව", "ගලෙන්බිඳුනුවැව", "කහටගස්දිගිලිය", "හොරොව්පොතාන", "මහාවිලච්චිය", "මැදවච්චිය", "පදවිය", "ගල්නෑව", "ඉපලෝගම", "නාච්චාදුව", "තිරප්පනේ", "කැබිතිගොල්ලෑව", "රාජාංගණය", "එප්පාවල", "නොච්චියාගම", "පලුගස්වැව"},
+	"පොළොන්නරුව":   {"තාමන්කඩුව", "හිඟුරක්ගොඩ", "මැදිරිගිරිය", "ලංකාපුර", "ඇලහැර", "දිඹුලාගල", "වැලිකන්ද"},
+	"බදුල්ල":       {"බදුල්ල", "බණ්ඩාරවෙල", "හපුතලේ", "ඇල්ල", "ලුණුගල", "මහියංගනය", "මීගහකිවුල", "පස්සර", "රිදීමාලියද්ද", "සොරණාතොට", "උව-පරණගම", "වැලිමඩ", "කන්දකැටිය", "හල්දුම්මුල්ල", "හාලි-ඇල"},
+	"මොණරාගල":      {"මොණරාගල", "වැල්ලවාය", "බුත්තල", "කතරගම", "බිබිල", "මැදගම", "මඩුල්ල", "සියඹලාණ්ඩුව", "බදල්කුඹුර", "සෙවනගල", "තණමල්විල"},
+	"රත්නපුර":      {"රත්නපුර", "බලංගොඩ", "එහෙළියගොඩ", "කලවාන", "කුරුවිට", "නිවිතිගල", "පැල්මඩුල්ල", "කොලොන්න", "කහවත්ත", "එලපාත", "අයගම", "ගොඩකවෙල", "ඉඹුල්පේ", "ඕපනායක", "වැලිගෙපොල", "කිරිඇල්ල"},
+	"කෑගල්ල":       {"කෑගල්ල", "මාවනැල්ල", "රඹුක්කන", "වරකාපොල", "රුවන්වැල්ල", "යටියන්තොට", "දෙරණියගල", "ගාලිගමුව", "බුලත්කොහුපිටිය", "දෙහිඕවිට", "අරණායක"},
+}
+
+// GetLatestDistricts returns the distinct district values found among the
+// latest edition of every application.
+func (u *miningLicenseUsecase) GetLatestDistricts(ctx context.Context) ([]string, error) {
+	docs, err := u.repo.GetAllLatestFull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool)
+	districts := make([]string, 0)
+	for _, doc := range docs {
+		if doc.District == "" || seen[doc.District] {
+			continue
+		}
+		seen[doc.District] = true
+		districts = append(districts, doc.District)
+	}
+	sort.Strings(districts)
+	return districts, nil
+}
+
+// GetLatestRegionalOffices returns the distinct regionalOffice values found
+// among the latest edition of applications belonging to the given district.
+// Values are additionally cross-checked against dsDivisionsByDistrict so a
+// stray/typo'd regionalOffice on a record can never leak into the dropdown.
+func (u *miningLicenseUsecase) GetLatestRegionalOffices(ctx context.Context, district string) ([]string, error) {
+	if district == "" {
+		return nil, errors.New("district is required")
+	}
+
+	validOffices := make(map[string]bool)
+	for _, office := range dsDivisionsByDistrict[district] {
+		validOffices[office] = true
+	}
+
+	docs, err := u.repo.GetAllLatestFull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool)
+	offices := make([]string, 0)
+	for _, doc := range docs {
+		if doc.District != district || doc.RegionalOffice == "" {
+			continue
+		}
+		if !validOffices[doc.RegionalOffice] || seen[doc.RegionalOffice] {
+			continue
+		}
+		seen[doc.RegionalOffice] = true
+		offices = append(offices, doc.RegionalOffice)
+	}
+	sort.Strings(offices)
+	return offices, nil
+}
+
+// GetLatestFiltered returns the latest edition of every application matching
+// both district and regionalOffice, projected to the slim result set.
+func (u *miningLicenseUsecase) GetLatestFiltered(ctx context.Context, district string, regionalOffice string) ([]domain.FilteredLicenseSummary, error) {
+	if district == "" || regionalOffice == "" {
+		return nil, errors.New("district and regionalOffice are required")
+	}
+
+	docs, err := u.repo.GetAllLatestFull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]domain.FilteredLicenseSummary, 0)
+	for _, doc := range docs {
+		if doc.District != district || doc.RegionalOffice != regionalOffice {
+			continue
+		}
+		results = append(results, domain.FilteredLicenseSummary{
+			ID:             doc.ID,
+			ApplicantName:  doc.ApplicantName,
+			ApplicantPhone: doc.ApplicantPhone,
+			TIN:            doc.TIN,
+			GMLNumber:      doc.GMLNumber,
+			GPSPoints:      doc.GPSPoints,
+			CreatedBy:      doc.CreatedBy,
+			CreatedAt:      doc.CreatedAt,
+			UpdatedAt:      doc.UpdatedAt,
+			Status:         doc.Status,
+		})
+	}
+	return results, nil
 }

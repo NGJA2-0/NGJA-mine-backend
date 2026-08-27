@@ -156,6 +156,21 @@ type PaginatedMiningLicenseSummaries struct {
 	TotalPages int                    `json:"totalPages"`
 }
 
+// FilteredLicenseSummary is the slim projection returned by the
+// district + regionalOffice filter endpoint.
+type FilteredLicenseSummary struct {
+	ID             primitive.ObjectID `json:"id" bson:"_id"`
+	ApplicantName  string             `json:"applicantName" bson:"applicantName"`
+	ApplicantPhone string             `json:"applicantPhone" bson:"applicantPhone"`
+	TIN            string             `json:"tin" bson:"tin"`
+	GMLNumber      string             `json:"gmlNumber" bson:"gmlNumber"`
+	GPSPoints      []GPSPoint         `json:"gpsPoints" bson:"gpsPoints"`
+	CreatedBy      string             `json:"createdBy" bson:"createdBy"`
+	CreatedAt      time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt      time.Time          `json:"updatedAt" bson:"updatedAt"`
+	Status         string             `json:"status" bson:"status"`
+}
+
 // FieldChange represents a single changed field between versions
 type FieldChange struct {
 	Old interface{} `json:"old"`
@@ -187,6 +202,11 @@ type MiningLicenseRepository interface {
 	GetByBaseReferenceNumber(ctx context.Context, baseRef string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
 	GetLatestByReferenceNumber(ctx context.Context, baseRef string) (*LatestMiningLicenseInfo, error)
 	GetAllLatest(ctx context.Context) ([]LatestMiningLicenseInfo, error)
+	// GetAllLatestFull is the full-document version of GetAllLatest — same
+	// dedup rule (highest version per base reference number wins), but
+	// returns the whole document instead of the slim map projection. Used
+	// by the district / regionalOffice / filter dropdown endpoints.
+	GetAllLatestFull(ctx context.Context) ([]MechanizedGemMiningLicense, error)
 }
 
 // MiningLicenseUsecase defines business logic for mining license applications
@@ -204,6 +224,16 @@ type MiningLicenseUsecase interface {
 	GetByReferenceNumber(ctx context.Context, refNumber string, page int, limit int) (*PaginatedMiningLicenseSummaries, error)
 	GetLatestByReferenceNumber(ctx context.Context, baseRef string) (*LatestMiningLicenseInfo, error)
 	GetAllLatest(ctx context.Context) ([]LatestMiningLicenseInfo, error)
+	// GetLatestDistricts returns the distinct districts found among the
+	// latest edition of every application.
+	GetLatestDistricts(ctx context.Context) ([]string, error)
+	// GetLatestRegionalOffices returns the distinct regionalOffice values
+	// for the given district, found among the latest edition of every
+	// application in that district.
+	GetLatestRegionalOffices(ctx context.Context, district string) ([]string, error)
+	// GetLatestFiltered returns the latest edition of every application
+	// matching both district and regionalOffice, slim-projected.
+	GetLatestFiltered(ctx context.Context, district string, regionalOffice string) ([]FilteredLicenseSummary, error)
 }
 
 // LatestMiningLicenseInfo represents the required fields for the latest license.

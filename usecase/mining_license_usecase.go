@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -434,11 +435,23 @@ func (u *miningLicenseUsecase) GetLatestRegionalOffices(ctx context.Context, dis
 	return offices, nil
 }
 
+// allowedFilterPageSizes restricts the /filter endpoint's limit query param
+// to these values. Anything else falls back to the default of 10.
+var allowedFilterPageSizes = map[int]bool{10: true, 15: true, 20: true}
+
 // GetLatestFiltered returns the latest edition of every application matching
-// both district and regionalOffice, projected to the slim result set.
-func (u *miningLicenseUsecase) GetLatestFiltered(ctx context.Context, district string, regionalOffice string) ([]domain.FilteredLicenseSummary, error) {
+// both district and regionalOffice, projected to the slim result set and
+// paginated in-memory (same pattern as GetByTIN / GetByBaseReferenceNumber).
+func (u *miningLicenseUsecase) GetLatestFiltered(ctx context.Context, district string, regionalOffice string, page int, limit int) (*domain.PaginatedFilteredLicenses, error) {
 	if district == "" || regionalOffice == "" {
 		return nil, errors.New("district and regionalOffice are required")
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if !allowedFilterPageSizes[limit] {
+		limit = 10
 	}
 
 	docs, err := u.repo.GetAllLatestFull(ctx)
@@ -446,12 +459,12 @@ func (u *miningLicenseUsecase) GetLatestFiltered(ctx context.Context, district s
 		return nil, err
 	}
 
-	results := make([]domain.FilteredLicenseSummary, 0)
+	all := make([]domain.FilteredLicenseSummary, 0)
 	for _, doc := range docs {
 		if doc.District != district || doc.RegionalOffice != regionalOffice {
 			continue
 		}
-		results = append(results, domain.FilteredLicenseSummary{
+		all = append(all, domain.FilteredLicenseSummary{
 			ID:             doc.ID,
 			ApplicantName:  doc.ApplicantName,
 			ApplicantPhone: doc.ApplicantPhone,
@@ -464,5 +477,34 @@ func (u *miningLicenseUsecase) GetLatestFiltered(ctx context.Context, district s
 			Status:         doc.Status,
 		})
 	}
-	return results, nil
+
+	// Keep listing order stable across pages regardless of map iteration order
+	// upstream in GetAllLatestFull.
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].CreatedAt.After(all[j].CreatedAt)
+	})
+
+	total := int64(len(all))
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	skip := (page - 1) * limit
+	if skip > len(all) {
+		skip = len(all)
+	}
+	end := skip + limit
+	if end > len(all) {
+		end = len(all)
+	}
+	pageItems := all[skip:end]
+	if pageItems == nil {
+		pageItems = []domain.FilteredLicenseSummary{}
+	}
+
+	return &domain.PaginatedFilteredLicenses{
+		Data:       pageItems,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
 }

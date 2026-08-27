@@ -404,9 +404,10 @@ func (h *MiningLicenseHandler) GetLatestRegionalOffices(c *fiber.Ctx) error {
 }
 
 // GetLatestFiltered godoc
-// GET /api/mining-licenses/filter?district=X&regionalOffice=Y
+// GET /api/mining-licenses/filter?district=X&regionalOffice=Y&page=1&limit=10
 // Returns the latest edition of every application matching both filters,
-// projected to a slim result set.
+// projected to a slim result set and paginated. limit accepts 10, 15, or 20
+// (default 10); anything else is coerced back to 10.
 func (h *MiningLicenseHandler) GetLatestFiltered(c *fiber.Ctx) error {
 	district := c.Query("district")
 	regionalOffice := c.Query("regionalOffice")
@@ -416,12 +417,15 @@ func (h *MiningLicenseHandler) GetLatestFiltered(c *fiber.Ctx) error {
 		})
 	}
 
-	results, err := h.Usecase.GetLatestFiltered(c.Context(), district, regionalOffice)
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+
+	result, err := h.Usecase.GetLatestFiltered(c.Context(), district, regionalOffice, page, limit)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Filtered license applications retrieved successfully",
-		"data":    results,
+		"data":    result,
 	})
 }

@@ -171,6 +171,16 @@ type FilteredLicenseSummary struct {
 	Status         string             `json:"status" bson:"status"`
 }
 
+// PaginatedFilteredLicenses represents a paginated page of results from the
+// district + regionalOffice filter endpoint.
+type PaginatedFilteredLicenses struct {
+	Data       []FilteredLicenseSummary `json:"data"`
+	Total      int64                    `json:"total"`
+	Page       int                      `json:"page"`
+	Limit      int                      `json:"limit"`
+	TotalPages int                      `json:"totalPages"`
+}
+
 // FieldChange represents a single changed field between versions
 type FieldChange struct {
 	Old interface{} `json:"old"`
@@ -232,8 +242,9 @@ type MiningLicenseUsecase interface {
 	// application in that district.
 	GetLatestRegionalOffices(ctx context.Context, district string) ([]string, error)
 	// GetLatestFiltered returns the latest edition of every application
-	// matching both district and regionalOffice, slim-projected.
-	GetLatestFiltered(ctx context.Context, district string, regionalOffice string) ([]FilteredLicenseSummary, error)
+	// matching both district and regionalOffice, slim-projected and paginated.
+	// limit is restricted to 10, 15, or 20 — anything else defaults to 10.
+	GetLatestFiltered(ctx context.Context, district string, regionalOffice string, page int, limit int) (*PaginatedFilteredLicenses, error)
 }
 
 // LatestMiningLicenseInfo represents the required fields for the latest license.

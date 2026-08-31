@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -420,3 +421,91 @@ func summaryVersion(referenceNumber string) int {
 	return v
 }
 
+func (r *miningLicenseMongoRepo) GetLatestByReferenceNumber(ctx context.Context, baseRef string) (*domain.LatestMiningLicenseInfo, error) {
+	maxVersion, err := r.GetMaxVersionByBaseRef(ctx, baseRef)
+	if err != nil {
+		return nil, err
+	}
+
+	targetRef := baseRef
+	if maxVersion > 0 {
+		targetRef = fmt.Sprintf("%s.%d", baseRef, maxVersion)
+	}
+
+	var doc domain.MechanizedGemMiningLicense
+	err = r.collection.FindOne(ctx, bson.M{"referenceNumber": targetRef}).Decode(&doc)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &domain.LatestMiningLicenseInfo{
+		ID:            doc.ID,
+		ApplicantName: doc.ApplicantName,
+		Status:        doc.Status,
+	}
+
+	if len(doc.GPSPoints) > 0 {
+		res.Latitude = doc.GPSPoints[0].Latitude
+		res.Longitude = doc.GPSPoints[0].Longitude
+	}
+
+	return res, nil
+}
+// GetAllLatestFull returns every license document, deduplicated so only the
+// highest version per base reference number survives (e.g. REF_2, REF_2.1,
+// REF_2.12 -> only REF_2.12 is kept). This is the shared building block
+// behind GetAllLatest and the district/regionalOffice/filter endpoints.
+func (r *miningLicenseMongoRepo) GetAllLatestFull(ctx context.Context) ([]domain.MechanizedGemMiningLicense, error) {
+	cursor, err := r.collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var all []domain.MechanizedGemMiningLicense
+	if err := cursor.All(ctx, &all); err != nil {
+		return nil, err
+	}
+
+	latestMap := make(map[string]domain.MechanizedGemMiningLicense)
+	for _, doc := range all {
+		baseRef := doc.ReferenceNumber
+		if idx := strings.Index(baseRef, "."); idx != -1 {
+			baseRef = baseRef[:idx]
+		}
+
+		existing, found := latestMap[baseRef]
+		if !found || summaryVersion(doc.ReferenceNumber) > summaryVersion(existing.ReferenceNumber) {
+			latestMap[baseRef] = doc
+		}
+	}
+
+	results := make([]domain.MechanizedGemMiningLicense, 0, len(latestMap))
+	for _, doc := range latestMap {
+		results = append(results, doc)
+	}
+	return results, nil
+}
+
+// GetAllLatest returns the slim map-marker projection of every latest license.
+func (r *miningLicenseMongoRepo) GetAllLatest(ctx context.Context) ([]domain.LatestMiningLicenseInfo, error) {
+	docs, err := r.GetAllLatestFull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]domain.LatestMiningLicenseInfo, 0, len(docs))
+	for _, doc := range docs {
+		info := domain.LatestMiningLicenseInfo{
+			ID:            doc.ID,
+			ApplicantName: doc.ApplicantName,
+			Status:        doc.Status,
+		}
+		if len(doc.GPSPoints) > 0 {
+			info.Latitude = doc.GPSPoints[0].Latitude
+			info.Longitude = doc.GPSPoints[0].Longitude
+		}
+		results = append(results, info)
+	}
+	return results, nil
+}

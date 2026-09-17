@@ -508,3 +508,186 @@ func (u *miningLicenseUsecase) GetLatestFiltered(ctx context.Context, district s
 		TotalPages: totalPages,
 	}, nil
 }
+func (u *miningLicenseUsecase) GetDistrictMapClusters(ctx context.Context) ([]domain.MapDistrictCluster, error) {
+	docs, err := u.repo.GetAllLatestFull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	type acc struct {
+		count int
+		lats  []float64
+		lngs  []float64
+	}
+	byDistrict := make(map[string]*acc)
+
+	for _, doc := range docs {
+		if doc.District == "" || len(doc.GPSPoints) == 0 {
+			continue
+		}
+		lat, ok1 := parseGPSFloat(doc.GPSPoints[0].Latitude)
+		lng, ok2 := parseGPSFloat(doc.GPSPoints[0].Longitude)
+		if !ok1 || !ok2 {
+			continue
+		}
+		a, ok := byDistrict[doc.District]
+		if !ok {
+			a = &acc{}
+			byDistrict[doc.District] = a
+		}
+		a.count++
+		a.lats = append(a.lats, lat)
+		a.lngs = append(a.lngs, lng)
+	}
+
+	clusters := make([]domain.MapDistrictCluster, 0, len(byDistrict))
+	for district, a := range byDistrict {
+		clusters = append(clusters, domain.MapDistrictCluster{
+			District:  district,
+			Count:     a.count,
+			Latitude:  avgFloat(a.lats),
+			Longitude: avgFloat(a.lngs),
+			Bounds:    gpsBounds(a.lats, a.lngs),
+		})
+	}
+	sort.Slice(clusters, func(i, j int) bool { return clusters[i].District < clusters[j].District })
+	return clusters, nil
+}
+
+func (u *miningLicenseUsecase) GetRegionalOfficeMapClusters(ctx context.Context, district string) ([]domain.MapRegionalOfficeCluster, error) {
+	if district == "" {
+		return nil, errors.New("district is required")
+	}
+
+	docs, err := u.repo.GetAllLatestFull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	type acc struct {
+		count int
+		lats  []float64
+		lngs  []float64
+	}
+	byOffice := make(map[string]*acc)
+
+	for _, doc := range docs {
+		if doc.District != district || doc.RegionalOffice == "" || len(doc.GPSPoints) == 0 {
+			continue
+		}
+		lat, ok1 := parseGPSFloat(doc.GPSPoints[0].Latitude)
+		lng, ok2 := parseGPSFloat(doc.GPSPoints[0].Longitude)
+		if !ok1 || !ok2 {
+			continue
+		}
+		a, ok := byOffice[doc.RegionalOffice]
+		if !ok {
+			a = &acc{}
+			byOffice[doc.RegionalOffice] = a
+		}
+		a.count++
+		a.lats = append(a.lats, lat)
+		a.lngs = append(a.lngs, lng)
+	}
+
+	clusters := make([]domain.MapRegionalOfficeCluster, 0, len(byOffice))
+	for office, a := range byOffice {
+		clusters = append(clusters, domain.MapRegionalOfficeCluster{
+			District:       district,
+			RegionalOffice: office,
+			Count:          a.count,
+			Latitude:       avgFloat(a.lats),
+			Longitude:      avgFloat(a.lngs),
+			Bounds:         gpsBounds(a.lats, a.lngs),
+		})
+	}
+	sort.Slice(clusters, func(i, j int) bool { return clusters[i].RegionalOffice < clusters[j].RegionalOffice })
+	return clusters, nil
+}
+
+func (u *miningLicenseUsecase) GetMineMapMarkers(ctx context.Context, district string, regionalOffice string) ([]domain.MapMineMarker, error) {
+	if district == "" || regionalOffice == "" {
+		return nil, errors.New("district and regionalOffice are required")
+	}
+
+	docs, err := u.repo.GetAllLatestFull(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	markers := make([]domain.MapMineMarker, 0)
+	for _, doc := range docs {
+		if doc.District != district || doc.RegionalOffice != regionalOffice || len(doc.GPSPoints) == 0 {
+			continue
+		}
+		lat, ok1 := parseGPSFloat(doc.GPSPoints[0].Latitude)
+		lng, ok2 := parseGPSFloat(doc.GPSPoints[0].Longitude)
+		if !ok1 || !ok2 {
+			continue
+		}
+		markers = append(markers, domain.MapMineMarker{
+			ID:              doc.ID,
+			ReferenceNumber: doc.ReferenceNumber,
+			ApplicantName:   doc.ApplicantName,
+			TIN:             doc.TIN,
+			GMLNumber:       doc.GMLNumber,
+			LandName:        doc.LandName,
+			District:        doc.District,
+			RegionalOffice:  doc.RegionalOffice,
+			Status:          doc.Status,
+			Latitude:        lat,
+			Longitude:       lng,
+			GPSPoints:       doc.GPSPoints,
+		})
+	}
+	return markers, nil
+}
+
+// parseGPSFloat parses a GPS coordinate string, ignoring points that can't be parsed.
+func parseGPSFloat(s string) (float64, bool) {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+// avgFloat returns the mean of a slice of floats (0 if empty).
+func avgFloat(vals []float64) float64 {
+	if len(vals) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, v := range vals {
+		sum += v
+	}
+	return sum / float64(len(vals))
+}
+
+// gpsBounds returns the lat/lng bounding box enclosing the given points.
+func gpsBounds(lats []float64, lngs []float64) *domain.MapBounds {
+	if len(lats) == 0 || len(lngs) == 0 {
+		return nil
+	}
+	b := &domain.MapBounds{
+		MinLatitude: lats[0], MaxLatitude: lats[0],
+		MinLongitude: lngs[0], MaxLongitude: lngs[0],
+	}
+	for i := 1; i < len(lats); i++ {
+		if lats[i] < b.MinLatitude {
+			b.MinLatitude = lats[i]
+		}
+		if lats[i] > b.MaxLatitude {
+			b.MaxLatitude = lats[i]
+		}
+	}
+	for i := 1; i < len(lngs); i++ {
+		if lngs[i] < b.MinLongitude {
+			b.MinLongitude = lngs[i]
+		}
+		if lngs[i] > b.MaxLongitude {
+			b.MaxLongitude = lngs[i]
+		}
+	}
+	return b
+}

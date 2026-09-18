@@ -46,13 +46,24 @@ type MiniSahanaForm struct {
 	LicenseRegionalOfficeAndZone string                `json:"licenseRegionalOfficeAndZone" bson:"licenseRegionalOfficeAndZone" validate:"required"`
 	Attachments                  MiniSahanaAttachments `json:"attachments" bson:"attachments" validate:"required"`
 	DeclarationSigned            *bool                 `json:"declarationSigned" bson:"declarationSigned" validate:"required"`
+	CreatedBy                    string                `json:"createdBy,omitempty" bson:"createdBy,omitempty"`
+	RefNumber                    string                `json:"refNumber,omitempty" bson:"refNumber,omitempty"`
 	CreatedAt                    time.Time             `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
 }
 
 type MiniSahanaRepository interface {
 	Create(ctx context.Context, form *MiniSahanaForm) error
+	GetLatestRefNumber(ctx context.Context) (string, error)
+	GetByID(ctx context.Context, id string) (*MiniSahanaForm, error)
+	Search(ctx context.Context, query string) ([]*MiniSahanaForm, error)
+	Update(ctx context.Context, id string, form *MiniSahanaForm) error
+	Delete(ctx context.Context, id string) error
 }
 
 type MiniSahanaUsecase interface {
-	Create(ctx context.Context, form *MiniSahanaForm) error
+	Create(ctx context.Context, form *MiniSahanaForm, userID string) error
+	GetByID(ctx context.Context, id string) (*MiniSahanaForm, error)
+	Search(ctx context.Context, query string) ([]*MiniSahanaForm, error)
+	Update(ctx context.Context, id string, form *MiniSahanaForm, userID string) error
+	Delete(ctx context.Context, id string) error
 }

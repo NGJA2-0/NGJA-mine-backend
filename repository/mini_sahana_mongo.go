@@ -2,11 +2,14 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"my-fiber-app/domain"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type miniSahanaMongoRepo struct {
@@ -30,4 +33,91 @@ func (r *miniSahanaMongoRepo) Create(ctx context.Context, form *domain.MiniSahan
 	form.ID = primitive.NewObjectID()
 	_, err := r.collection.InsertOne(ctx, form)
 	return err
+}
+
+func (r *miniSahanaMongoRepo) GetLatestRefNumber(ctx context.Context) (string, error) {
+	opts := options.FindOne().SetSort(bson.M{"createdAt": -1})
+	var result domain.MiniSahanaForm
+	err := r.collection.FindOne(ctx, bson.M{}, opts).Decode(&result)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return "", nil // No records yet
+		}
+		return "", err
+	}
+	return result.RefNumber, nil
+}
+
+func (r *miniSahanaMongoRepo) GetByID(ctx context.Context, id string) (*domain.MiniSahanaForm, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, errors.New("invalid id format")
+	}
+
+	var form domain.MiniSahanaForm
+	err = r.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&form)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, errors.New("record not found")
+		}
+		return nil, err
+	}
+	return &form, nil
+}
+
+func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*domain.MiniSahanaForm, error) {
+	var forms []*domain.MiniSahanaForm
+
+	// Regex for partial matching, case-insensitive
+	filter := bson.M{
+		"$or": []bson.M{
+			{"applicantFullNameSinhala": bson.M{"$regex": query, "$options": "i"}},
+			{"bankAccountNumber": bson.M{"$regex": query, "$options": "i"}},
+			{"nic": bson.M{"$regex": query, "$options": "i"}},
+		},
+	}
+
+	opts := options.Find().SetLimit(10) // Limit to 10 for suggestions
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &forms); err != nil {
+		return nil, err
+	}
+
+	if forms == nil {
+		forms = []*domain.MiniSahanaForm{}
+	}
+	return forms, nil
+}
+
+func (r *miniSahanaMongoRepo) Update(ctx context.Context, id string, form *domain.MiniSahanaForm) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return errors.New("invalid id format")
+	}
+
+	form.ID = oid
+	_, err = r.collection.ReplaceOne(ctx, bson.M{"_id": oid}, form)
+	return err
+}
+
+func (r *miniSahanaMongoRepo) Delete(ctx context.Context, id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return errors.New("invalid id format")
+	}
+
+	res, err := r.collection.DeleteOne(ctx, bson.M{"_id": oid})
+	if err != nil {
+		return err
+	}
+	if res.DeletedCount == 0 {
+		return errors.New("record not found")
+	}
+	return nil
 }

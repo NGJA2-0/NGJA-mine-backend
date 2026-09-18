@@ -65,8 +65,8 @@ func (r *miniSahanaMongoRepo) GetByID(ctx context.Context, id string) (*domain.M
 	return &form, nil
 }
 
-func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*domain.MiniSahanaForm, error) {
-	var forms []*domain.MiniSahanaForm
+func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*domain.MiniSahanaSearchSuggestion, error) {
+	var suggestions []*domain.MiniSahanaSearchSuggestion
 
 	// Regex for partial matching, case-insensitive
 	filter := bson.M{
@@ -77,7 +77,13 @@ func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*doma
 		},
 	}
 
-	opts := options.Find().SetLimit(10) // Limit to 10 for suggestions
+	opts := options.Find().
+		SetLimit(10).
+		SetProjection(bson.M{
+			"applicantFullNameSinhala": 1,
+			"bankAccountNumber":        1,
+			"nic":                      1,
+		})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
@@ -85,14 +91,14 @@ func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*doma
 	}
 	defer cursor.Close(ctx)
 
-	if err = cursor.All(ctx, &forms); err != nil {
+	if err = cursor.All(ctx, &suggestions); err != nil {
 		return nil, err
 	}
 
-	if forms == nil {
-		forms = []*domain.MiniSahanaForm{}
+	if suggestions == nil {
+		suggestions = []*domain.MiniSahanaSearchSuggestion{}
 	}
-	return forms, nil
+	return suggestions, nil
 }
 
 func (r *miniSahanaMongoRepo) Update(ctx context.Context, id string, form *domain.MiniSahanaForm) error {

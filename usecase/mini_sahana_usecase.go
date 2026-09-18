@@ -87,9 +87,9 @@ func (u *miniSahanaUsecase) GetByID(ctx context.Context, id string) (*domain.Min
 	return u.repo.GetByID(ctx, id)
 }
 
-func (u *miniSahanaUsecase) Search(ctx context.Context, query string) ([]*domain.MiniSahanaForm, error) {
+func (u *miniSahanaUsecase) Search(ctx context.Context, query string) ([]*domain.MiniSahanaSearchSuggestion, error) {
 	if strings.TrimSpace(query) == "" {
-		return []*domain.MiniSahanaForm{}, nil
+		return []*domain.MiniSahanaSearchSuggestion{}, nil
 	}
 	return u.repo.Search(ctx, query)
 }

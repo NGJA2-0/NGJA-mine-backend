@@ -51,11 +51,18 @@ type MiniSahanaForm struct {
 	CreatedAt                    time.Time             `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
 }
 
+type MiniSahanaSearchSuggestion struct {
+	ID                       primitive.ObjectID `json:"id" bson:"_id"`
+	ApplicantFullNameSinhala string             `json:"applicantFullNameSinhala" bson:"applicantFullNameSinhala"`
+	BankAccountNumber        string             `json:"bankAccountNumber" bson:"bankAccountNumber"`
+	NIC                      string             `json:"nic" bson:"nic"`
+}
+
 type MiniSahanaRepository interface {
 	Create(ctx context.Context, form *MiniSahanaForm) error
 	GetLatestRefNumber(ctx context.Context) (string, error)
 	GetByID(ctx context.Context, id string) (*MiniSahanaForm, error)
-	Search(ctx context.Context, query string) ([]*MiniSahanaForm, error)
+	Search(ctx context.Context, query string) ([]*MiniSahanaSearchSuggestion, error)
 	Update(ctx context.Context, id string, form *MiniSahanaForm) error
 	Delete(ctx context.Context, id string) error
 }
@@ -63,7 +70,7 @@ type MiniSahanaRepository interface {
 type MiniSahanaUsecase interface {
 	Create(ctx context.Context, form *MiniSahanaForm, userID string) error
 	GetByID(ctx context.Context, id string) (*MiniSahanaForm, error)
-	Search(ctx context.Context, query string) ([]*MiniSahanaForm, error)
+	Search(ctx context.Context, query string) ([]*MiniSahanaSearchSuggestion, error)
 	Update(ctx context.Context, id string, form *MiniSahanaForm, userID string) error
 	Delete(ctx context.Context, id string) error
 }

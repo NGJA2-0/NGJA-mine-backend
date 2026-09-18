@@ -31,6 +31,9 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Get("/districts", auth, handler.GetLatestDistricts)
 	api.Get("/regional-offices", auth, handler.GetLatestRegionalOffices)
 	api.Get("/filter", auth, handler.GetLatestFiltered)
+	api.Get("/map/districts", auth, handler.GetMapDistrictClusters)
+	api.Get("/map/regional-offices", auth, handler.GetMapRegionalOfficeClusters)
+	api.Get("/map/mines", auth, handler.GetMapMineMarkers)
 	api.Get("/:id", auth, handler.GetByID)
 	api.Get("/:id/compare", auth, handler.CompareWithPrevious)
 	api.Post("/:id/edit", auth, handler.Edit)
@@ -427,5 +430,61 @@ func (h *MiningLicenseHandler) GetLatestFiltered(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Filtered license applications retrieved successfully",
 		"data":    result,
+	})
+}
+// GetMapDistrictClusters godoc
+// GET /api/mining-licenses/map/districts
+// Returns one cluster pin per district (first-load / zoomed-out map view).
+func (h *MiningLicenseHandler) GetMapDistrictClusters(c *fiber.Ctx) error {
+	clusters, err := h.Usecase.GetDistrictMapClusters(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "District map clusters retrieved successfully",
+		"data":    clusters,
+	})
+}
+
+// GetMapRegionalOfficeClusters godoc
+// GET /api/mining-licenses/map/regional-offices?district=X
+// Returns one cluster pin per regionalOffice within a district.
+func (h *MiningLicenseHandler) GetMapRegionalOfficeClusters(c *fiber.Ctx) error {
+	district := c.Query("district")
+	if district == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "district query param is required",
+		})
+	}
+
+	clusters, err := h.Usecase.GetRegionalOfficeMapClusters(c.Context(), district)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Regional office map clusters retrieved successfully",
+		"data":    clusters,
+	})
+}
+
+// GetMapMineMarkers godoc
+// GET /api/mining-licenses/map/mines?district=X&regionalOffice=Y
+// Returns every individual mine pin for a district + regionalOffice.
+func (h *MiningLicenseHandler) GetMapMineMarkers(c *fiber.Ctx) error {
+	district := c.Query("district")
+	regionalOffice := c.Query("regionalOffice")
+	if district == "" || regionalOffice == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "district and regionalOffice query params are required",
+		})
+	}
+
+	markers, err := h.Usecase.GetMineMapMarkers(c.Context(), district, regionalOffice)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Mine markers retrieved successfully",
+		"data":    markers,
 	})
 }

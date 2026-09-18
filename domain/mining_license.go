@@ -193,6 +193,65 @@ type CompareResult struct {
 	Changes map[string]FieldChange `json:"changes"`
 }
 
+// MapBounds is the lat/lng box enclosing every mine in a cluster.
+type MapBounds struct {
+	MinLatitude  float64 `json:"minLatitude"`
+	MinLongitude float64 `json:"minLongitude"`
+	MaxLatitude  float64 `json:"maxLatitude"`
+	MaxLongitude float64 `json:"maxLongitude"`
+}
+
+// MapDistrictCluster is one pin on the first-load (district level) map.
+type MapDistrictCluster struct {
+	District  string     `json:"district"`
+	Count     int        `json:"count"`
+	Latitude  float64    `json:"latitude"`
+	Longitude float64    `json:"longitude"`
+	Bounds    *MapBounds `json:"bounds,omitempty"`
+}
+
+// MapRegionalOfficeCluster is one pin on the second (drill-in) level.
+type MapRegionalOfficeCluster struct {
+	District       string     `json:"district"`
+	RegionalOffice string     `json:"regionalOffice"`
+	Count          int        `json:"count"`
+	Latitude       float64    `json:"latitude"`
+	Longitude      float64    `json:"longitude"`
+	Bounds         *MapBounds `json:"bounds,omitempty"`
+}
+
+// MapMineMarker is one actual mine pin on the third level.
+type MapMineMarker struct {
+	ID              primitive.ObjectID `json:"id"`
+	ReferenceNumber string             `json:"referenceNumber"`
+	ApplicantName   string             `json:"applicantName"`
+	TIN             string             `json:"tin"`
+	GMLNumber       string             `json:"gmlNumber"`
+	LandName        string             `json:"landName"`
+	District        string             `json:"district"`
+	RegionalOffice  string             `json:"regionalOffice"`
+	Status          string             `json:"status"`
+	Latitude        float64            `json:"latitude"`
+	Longitude       float64            `json:"longitude"`
+	GPSPoints       []GPSPoint         `json:"gpsPoints"`
+}
+
+// DistrictClusterRow is the raw aggregation result for one district's map cluster.
+type DistrictClusterRow struct {
+	District string    `bson:"_id"`
+	Count    int       `bson:"count"`
+	Lats     []float64 `bson:"lats"`
+	Lngs     []float64 `bson:"lngs"`
+}
+
+// OfficeClusterRow is the raw aggregation result for one regional office's map cluster.
+type OfficeClusterRow struct {
+	RegionalOffice string    `bson:"_id"`
+	Count          int       `bson:"count"`
+	Lats           []float64 `bson:"lats"`
+	Lngs           []float64 `bson:"lngs"`
+}
+
 // MiningLicenseRepository defines DB operations for mining license applications
 type MiningLicenseRepository interface {
 	Create(ctx context.Context, license *MechanizedGemMiningLicense) error
@@ -245,6 +304,15 @@ type MiningLicenseUsecase interface {
 	// matching both district and regionalOffice, slim-projected and paginated.
 	// limit is restricted to 10, 15, or 20 — anything else defaults to 10.
 	GetLatestFiltered(ctx context.Context, district string, regionalOffice string, page int, limit int) (*PaginatedFilteredLicenses, error)
+		// GetDistrictMapClusters returns one pin per district that has at least
+	// one mine with GPS points — used for the map's first load.
+	GetDistrictMapClusters(ctx context.Context) ([]MapDistrictCluster, error)
+	// GetRegionalOfficeMapClusters returns one pin per regionalOffice within
+	// the given district — used when a user clicks/zooms into a district pin.
+	GetRegionalOfficeMapClusters(ctx context.Context, district string) ([]MapRegionalOfficeCluster, error)
+	// GetMineMapMarkers returns every individual mine pin for the given
+	// district + regionalOffice — used when a user clicks/zooms into an office pin.
+	GetMineMapMarkers(ctx context.Context, district string, regionalOffice string) ([]MapMineMarker, error)
 }
 
 // LatestMiningLicenseInfo represents the required fields for the latest license.

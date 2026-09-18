@@ -159,6 +159,7 @@ func (h *MiningLicenseHandler) GetByTIN(c *fiber.Ctx) error {
 			"updatedAt":       lic.UpdatedAt,
 			"referenceNumber": lic.ReferenceNumber,
 			"applicantName":   lic.ApplicantName,
+			"applicantPhone":  lic.ApplicantPhone,
 			"tin":             lic.TIN,
 			"gmlNumber":       lic.GMLNumber,
 			"createdBy":       lic.CreatedBy,

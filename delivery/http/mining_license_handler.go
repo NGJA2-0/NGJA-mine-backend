@@ -165,6 +165,7 @@ func (h *MiningLicenseHandler) GetByTIN(c *fiber.Ctx) error {
 			"createdBy":       lic.CreatedBy,
 			"status":          lic.Status,
 			"type":            recordType,
+			"gpsPoints":       lic.GPSPoints,
 		})
 	}
 

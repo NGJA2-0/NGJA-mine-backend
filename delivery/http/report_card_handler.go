@@ -1,6 +1,9 @@
 package http
 
 import (
+	"fmt"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"my-fiber-app/domain"
@@ -23,16 +26,27 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 }
 
 func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
-	var card domain.ReportCard
+	// Parse multipart/form-data fields
+	card := domain.ReportCard{}
 
-	if err := c.BodyParser(&card); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	card.ApplicationID = strings.TrimSpace(c.FormValue("applicationId"))
+	card.FullName = strings.TrimSpace(c.FormValue("fullName"))
+	card.AccNumber = strings.TrimSpace(c.FormValue("accNumber"))
+	card.NIC = strings.TrimSpace(c.FormValue("nic"))
+	card.StartDate = strings.TrimSpace(c.FormValue("startDate"))
+	card.EndDate = strings.TrimSpace(c.FormValue("endDate"))
+
+	amountStr := strings.TrimSpace(c.FormValue("amount"))
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil || amount <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "amount must be a valid number greater than zero"})
 	}
+	card.Amount = amount
 
-	// Basic presence validation before passing to usecase
+	// Validate required text fields
 	errorsList := []string{}
 	checkEmpty := func(field string, name string) {
-		if strings.TrimSpace(field) == "" {
+		if field == "" {
 			errorsList = append(errorsList, name+" is required")
 		}
 	}
@@ -44,10 +58,6 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 	checkEmpty(card.StartDate, "startDate")
 	checkEmpty(card.EndDate, "endDate")
 
-	if card.Amount <= 0 {
-		errorsList = append(errorsList, "amount must be greater than zero")
-	}
-
 	if len(errorsList) > 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":  "Validation failed",
@@ -55,9 +65,29 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
-	err := h.Usecase.Create(c.Context(), &card)
+	// Handle PDF file upload
+	file, err := c.FormFile("pdf")
 	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "pdf file is required"})
+	}
+
+	// Only allow PDF files
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext != ".pdf" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "only PDF files are allowed"})
+	}
+
+	// Build the save path — usecase will generate the refNumber, so we use a temp name here.
+	// We pass the file through to the usecase after the refNumber is known.
+	// Step 1: Run business logic (calculates refNumber, totalDuration, totalAmount)
+	if err := h.Usecase.Create(c.Context(), &card); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Step 2: Save the PDF using the generated refNumber as the filename
+	savePath := fmt.Sprintf("./report_cards/%s.pdf", card.RefNumber)
+	if err := c.SaveFile(file, savePath); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to save PDF file"})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{

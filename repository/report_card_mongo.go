@@ -63,6 +63,7 @@ func (r *reportCardMongoRepo) Search(ctx context.Context, query string) ([]*doma
 			"fullName":      1,
 			"accNumber":     1,
 			"nic":           1,
+			"grade":         1,
 			"startDate":     1,
 			"endDate":       1,
 			"amount":        1,

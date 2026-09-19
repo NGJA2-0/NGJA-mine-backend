@@ -33,6 +33,9 @@ func (u *reportCardUsecase) Create(ctx context.Context, card *domain.ReportCard)
 	if strings.TrimSpace(card.NIC) == "" {
 		return errors.New("nic is required")
 	}
+	if strings.TrimSpace(card.Grade) == "" {
+		return errors.New("grade is required")
+	}
 	if strings.TrimSpace(card.StartDate) == "" {
 		return errors.New("startDate is required")
 	}

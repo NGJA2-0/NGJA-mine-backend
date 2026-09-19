@@ -39,15 +39,26 @@ type ReportCardSearchSuggestion struct {
 	TotalAmount   float64            `json:"totalAmount" bson:"totalAmount"`
 }
 
+// PaginatedReportCards represents a paginated list of report cards
+type PaginatedReportCards struct {
+	Data       []*ReportCard `json:"data"`
+	Total      int64         `json:"total"`
+	Page       int           `json:"page"`
+	Limit      int           `json:"limit"`
+	TotalPages int           `json:"totalPages"`
+}
+
 // ReportCardRepository defines the data access interface
 type ReportCardRepository interface {
 	Create(ctx context.Context, card *ReportCard) error
 	GetLatestRefNumber(ctx context.Context) (string, error)
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
+	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
 }
 
 // ReportCardUsecase defines the business logic interface
 type ReportCardUsecase interface {
 	Create(ctx context.Context, card *ReportCard) error
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
+	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
 }

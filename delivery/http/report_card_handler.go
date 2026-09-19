@@ -23,6 +23,7 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 
 	api := app.Group("/api/report-cards", middleware.Protected(jwtSecret))
 	api.Get("/search", handler.Search)
+	api.Get("/by-application/:applicationId", handler.GetByApplicationID)
 	api.Post("/", handler.Create)
 }
 
@@ -112,3 +113,26 @@ func (h *ReportCardHandler) Search(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(results)
 }
 
+func (h *ReportCardHandler) GetByApplicationID(c *fiber.Ctx) error {
+	applicationID := c.Params("applicationId")
+	if applicationID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "applicationId is required"})
+	}
+
+	page, err := strconv.Atoi(c.Query("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(c.Query("limit", "5"))
+	if err != nil {
+		limit = 5
+	}
+
+	result, err := h.Usecase.GetByApplicationID(c.Context(), applicationID, page, limit)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(result)
+}

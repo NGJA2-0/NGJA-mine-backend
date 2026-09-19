@@ -86,3 +86,43 @@ func (r *reportCardMongoRepo) Search(ctx context.Context, query string) ([]*doma
 	}
 	return suggestions, nil
 }
+
+func (r *reportCardMongoRepo) GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*domain.PaginatedReportCards, error) {
+	filter := bson.M{"applicationId": applicationID}
+
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	skip := int64((page - 1) * limit)
+	opts := options.Find().
+		SetSort(bson.M{"createdAt": -1}).
+		SetSkip(skip).
+		SetLimit(int64(limit))
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var cards []*domain.ReportCard
+	if err = cursor.All(ctx, &cards); err != nil {
+		return nil, err
+	}
+
+	if cards == nil {
+		cards = []*domain.ReportCard{}
+	}
+
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
+
+	return &domain.PaginatedReportCards{
+		Data:       cards,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
+}

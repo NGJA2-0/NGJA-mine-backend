@@ -95,3 +95,22 @@ func (u *reportCardUsecase) Search(ctx context.Context, query string) ([]*domain
 	return u.repo.Search(ctx, query)
 }
 
+func (u *reportCardUsecase) GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*domain.PaginatedReportCards, error) {
+	if strings.TrimSpace(applicationID) == "" {
+		return nil, errors.New("applicationId is required")
+	}
+
+	// Enforce allowed page sizes: 5, 10, 15 — default to 5
+	switch limit {
+	case 10, 15:
+		// valid
+	default:
+		limit = 5
+	}
+
+	if page < 1 {
+		page = 1
+	}
+
+	return u.repo.GetByApplicationID(ctx, applicationID, page, limit)
+}

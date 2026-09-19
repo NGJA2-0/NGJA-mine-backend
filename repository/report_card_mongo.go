@@ -44,3 +44,44 @@ func (r *reportCardMongoRepo) GetLatestRefNumber(ctx context.Context) (string, e
 	}
 	return result.RefNumber, nil
 }
+
+func (r *reportCardMongoRepo) Search(ctx context.Context, query string) ([]*domain.ReportCardSearchSuggestion, error) {
+	var suggestions []*domain.ReportCardSearchSuggestion
+
+	// Regex for partial matching, case-insensitive
+	filter := bson.M{
+		"$or": []bson.M{
+			{"fullName":  bson.M{"$regex": query, "$options": "i"}},
+			{"accNumber": bson.M{"$regex": query, "$options": "i"}},
+			{"nic":       bson.M{"$regex": query, "$options": "i"}},
+		},
+	}
+
+	opts := options.Find().
+		SetLimit(10).
+		SetProjection(bson.M{
+			"fullName":      1,
+			"accNumber":     1,
+			"nic":           1,
+			"startDate":     1,
+			"endDate":       1,
+			"amount":        1,
+			"totalDuration": 1,
+			"totalAmount":   1,
+		})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &suggestions); err != nil {
+		return nil, err
+	}
+
+	if suggestions == nil {
+		suggestions = []*domain.ReportCardSearchSuggestion{}
+	}
+	return suggestions, nil
+}

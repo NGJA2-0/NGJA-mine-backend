@@ -22,6 +22,7 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 	}
 
 	api := app.Group("/api/report-cards", middleware.Protected(jwtSecret))
+	api.Get("/search", handler.Search)
 	api.Post("/", handler.Create)
 }
 
@@ -99,3 +100,13 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 		"totalAmount":   card.TotalAmount,
 	})
 }
+
+func (h *ReportCardHandler) Search(c *fiber.Ctx) error {
+	query := c.Query("q")
+	results, err := h.Usecase.Search(c.Context(), query)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(results)
+}
+

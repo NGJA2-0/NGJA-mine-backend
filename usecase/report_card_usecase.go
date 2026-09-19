@@ -84,3 +84,11 @@ func (u *reportCardUsecase) Create(ctx context.Context, card *domain.ReportCard)
 
 	return u.repo.Create(ctx, card)
 }
+
+func (u *reportCardUsecase) Search(ctx context.Context, query string) ([]*domain.ReportCardSearchSuggestion, error) {
+	if strings.TrimSpace(query) == "" {
+		return []*domain.ReportCardSearchSuggestion{}, nil
+	}
+	return u.repo.Search(ctx, query)
+}
+

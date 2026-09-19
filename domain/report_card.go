@@ -24,13 +24,28 @@ type ReportCard struct {
 	CreatedAt     time.Time          `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
 }
 
+// ReportCardSearchSuggestion is the response shape for search/dropdown results
+type ReportCardSearchSuggestion struct {
+	ID            primitive.ObjectID `json:"id" bson:"_id"`
+	FullName      string             `json:"fullName" bson:"fullName"`
+	AccNumber     string             `json:"accNumber" bson:"accNumber"`
+	NIC           string             `json:"nic" bson:"nic"`
+	StartDate     string             `json:"startDate" bson:"startDate"`
+	EndDate       string             `json:"endDate" bson:"endDate"`
+	Amount        float64            `json:"amount" bson:"amount"`
+	TotalDuration int                `json:"totalDuration" bson:"totalDuration"`
+	TotalAmount   float64            `json:"totalAmount" bson:"totalAmount"`
+}
+
 // ReportCardRepository defines the data access interface
 type ReportCardRepository interface {
 	Create(ctx context.Context, card *ReportCard) error
 	GetLatestRefNumber(ctx context.Context) (string, error)
+	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 }
 
 // ReportCardUsecase defines the business logic interface
 type ReportCardUsecase interface {
 	Create(ctx context.Context, card *ReportCard) error
+	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 }

@@ -83,6 +83,7 @@ func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*doma
 			"applicantFullNameSinhala": 1,
 			"bankAccountNumber":        1,
 			"nic":                      1,
+			"grade":                    1,
 		})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)

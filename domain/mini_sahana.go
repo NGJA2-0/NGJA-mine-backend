@@ -56,6 +56,7 @@ type MiniSahanaSearchSuggestion struct {
 	ApplicantFullNameSinhala string             `json:"applicantFullNameSinhala" bson:"applicantFullNameSinhala"`
 	BankAccountNumber        string             `json:"bankAccountNumber" bson:"bankAccountNumber"`
 	NIC                      string             `json:"nic" bson:"nic"`
+	Grade                    string             `json:"grade" bson:"grade"`
 }
 
 type MiniSahanaRepository interface {

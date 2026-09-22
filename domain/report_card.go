@@ -14,7 +14,8 @@ type ReportCard struct {
 	FullName      string             `json:"fullName" bson:"fullName"`
 	AccNumber     string             `json:"accNumber" bson:"accNumber"`
 	NIC           string             `json:"nic" bson:"nic"`
-	Grade         string             `json:"grade" bson:"grade"`
+	AppliedGrade  string             `json:"appliedGrade" bson:"applied_grade"`
+	CurrentGrade  string             `json:"currentGrade" bson:"current_grade"`
 	RefNumber     string             `json:"refNumber,omitempty" bson:"refNumber,omitempty"`
 	PdfUrl        string             `json:"pdfUrl,omitempty" bson:"pdfUrl,omitempty"`
 	StartDate     string             `json:"startDate" bson:"startDate"`
@@ -31,7 +32,8 @@ type ReportCardSearchSuggestion struct {
 	FullName      string             `json:"fullName" bson:"fullName"`
 	AccNumber     string             `json:"accNumber" bson:"accNumber"`
 	NIC           string             `json:"nic" bson:"nic"`
-	Grade         string             `json:"grade" bson:"grade"`
+	AppliedGrade  string             `json:"appliedGrade" bson:"applied_grade"`
+	CurrentGrade  string             `json:"currentGrade" bson:"current_grade"`
 	StartDate     string             `json:"startDate" bson:"startDate"`
 	EndDate       string             `json:"endDate" bson:"endDate"`
 	Amount        float64            `json:"amount" bson:"amount"`

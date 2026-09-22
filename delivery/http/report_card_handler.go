@@ -35,7 +35,8 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 	card.FullName = strings.TrimSpace(c.FormValue("fullName"))
 	card.AccNumber = strings.TrimSpace(c.FormValue("accNumber"))
 	card.NIC = strings.TrimSpace(c.FormValue("nic"))
-	card.Grade = strings.TrimSpace(c.FormValue("grade"))
+	card.AppliedGrade = strings.TrimSpace(c.FormValue("appliedGrade"))
+	card.CurrentGrade = strings.TrimSpace(c.FormValue("currentGrade"))
 	card.StartDate = strings.TrimSpace(c.FormValue("startDate"))
 	card.EndDate = strings.TrimSpace(c.FormValue("endDate"))
 
@@ -58,7 +59,8 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 	checkEmpty(card.FullName, "fullName")
 	checkEmpty(card.AccNumber, "accNumber")
 	checkEmpty(card.NIC, "nic")
-	checkEmpty(card.Grade, "grade")
+	checkEmpty(card.AppliedGrade, "appliedGrade")
+	checkEmpty(card.CurrentGrade, "currentGrade")
 	checkEmpty(card.StartDate, "startDate")
 	checkEmpty(card.EndDate, "endDate")
 

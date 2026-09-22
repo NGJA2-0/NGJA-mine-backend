@@ -34,6 +34,7 @@ type ReportCardSearchSuggestion struct {
 	NIC           string             `json:"nic" bson:"nic"`
 	AppliedGrade  string             `json:"appliedGrade" bson:"applied_grade"`
 	CurrentGrade  string             `json:"currentGrade" bson:"current_grade"`
+	RegionalOffice string             `json:"regionalOffice" bson:"regionalOffice"`
 	StartDate     string             `json:"startDate" bson:"startDate"`
 	EndDate       string             `json:"endDate" bson:"endDate"`
 	Amount        float64            `json:"amount" bson:"amount"`

@@ -48,31 +48,50 @@ func (r *reportCardMongoRepo) GetLatestRefNumber(ctx context.Context) (string, e
 func (r *reportCardMongoRepo) Search(ctx context.Context, query string) ([]*domain.ReportCardSearchSuggestion, error) {
 	var suggestions []*domain.ReportCardSearchSuggestion
 
-	// Regex for partial matching, case-insensitive
-	filter := bson.M{
-		"$or": []bson.M{
-			{"fullName":  bson.M{"$regex": query, "$options": "i"}},
-			{"accNumber": bson.M{"$regex": query, "$options": "i"}},
-			{"nic":       bson.M{"$regex": query, "$options": "i"}},
-		},
+	pipeline := mongo.Pipeline{
+		// Join each report card to its owning application, by converting
+		// applicationId (string) to the applications collection's ObjectId.
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from": "applications",
+			"let":  bson.M{"appId": "$applicationId"},
+			"pipeline": mongo.Pipeline{
+				bson.D{{Key: "$match", Value: bson.M{
+					"$expr": bson.M{"$eq": bson.A{"$_id", bson.M{"$toObjectId": "$$appId"}}},
+				}}},
+			},
+			"as": "application",
+		}}},
+		bson.D{{Key: "$unwind", Value: bson.M{
+			"path":                       "$application",
+			"preserveNullAndEmptyArrays": true,
+		}}},
+		bson.D{{Key: "$match", Value: bson.M{
+			"$or": []bson.M{
+				{"fullName": bson.M{"$regex": query, "$options": "i"}},
+				{"accNumber": bson.M{"$regex": query, "$options": "i"}},
+				{"nic": bson.M{"$regex": query, "$options": "i"}},
+				{"applied_grade": bson.M{"$regex": query, "$options": "i"}},
+				{"current_grade": bson.M{"$regex": query, "$options": "i"}},
+				{"application.licenseRegionalOfficeAndZone": bson.M{"$regex": query, "$options": "i"}},
+			},
+		}}},
+		bson.D{{Key: "$limit", Value: int64(10)}},
+		bson.D{{Key: "$project", Value: bson.M{
+			"fullName":       1,
+			"accNumber":      1,
+			"nic":            1,
+			"applied_grade":  1,
+			"current_grade":  1,
+			"startDate":      1,
+			"endDate":        1,
+			"amount":         1,
+			"totalDuration":  1,
+			"totalAmount":    1,
+			"regionalOffice": "$application.licenseRegionalOfficeAndZone",
+		}}},
 	}
 
-	opts := options.Find().
-		SetLimit(10).
-		SetProjection(bson.M{
-			"fullName":      1,
-			"accNumber":     1,
-			"nic":           1,
-			"applied_grade": 1,
-        	"current_grade": 1,
-			"startDate":     1,
-			"endDate":       1,
-			"amount":        1,
-			"totalDuration": 1,
-			"totalAmount":   1,
-		})
-
-	cursor, err := r.collection.Find(ctx, filter, opts)
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}

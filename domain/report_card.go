@@ -57,6 +57,7 @@ type ReportCardRepository interface {
 	GetLatestRefNumber(ctx context.Context) (string, error)
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
+	ListSubmissions(ctx context.Context, grade string, year int, page int, limit int) (*PaginatedReportCards, error)
 }
 
 // ReportCardUsecase defines the business logic interface
@@ -64,4 +65,5 @@ type ReportCardUsecase interface {
 	Create(ctx context.Context, card *ReportCard) error
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
+	ListSubmissions(ctx context.Context, grade string, page int, limit int) (*PaginatedReportCards, error)
 }

@@ -117,3 +117,17 @@ func (u *reportCardUsecase) GetByApplicationID(ctx context.Context, applicationI
 
 	return u.repo.GetByApplicationID(ctx, applicationID, page, limit)
 }
+func (u *reportCardUsecase) ListSubmissions(ctx context.Context, grade string, page int, limit int) (*domain.PaginatedReportCards, error) {
+	switch limit {
+	case 10, 15, 20:
+		// valid
+	default:
+		limit = 10
+	}
+	if page < 1 {
+		page = 1
+	}
+
+	year := time.Now().Year()
+	return u.repo.ListSubmissions(ctx, grade, year, page, limit)
+}

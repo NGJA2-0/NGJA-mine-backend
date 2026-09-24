@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	"my-fiber-app/domain"
 
@@ -132,6 +134,52 @@ func (r *reportCardMongoRepo) GetByApplicationID(ctx context.Context, applicatio
 		return nil, err
 	}
 
+	if cards == nil {
+		cards = []*domain.ReportCard{}
+	}
+
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
+
+	return &domain.PaginatedReportCards{
+		Data:       cards,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
+}
+func (r *reportCardMongoRepo) ListSubmissions(ctx context.Context, grade string, year int, page int, limit int) (*domain.PaginatedReportCards, error) {
+	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	filter := bson.M{
+		"createdAt": bson.M{"$gte": start, "$lt": end},
+	}
+	if strings.TrimSpace(grade) != "" {
+		filter["current_grade"] = grade
+	}
+
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	skip := int64((page - 1) * limit)
+	opts := options.Find().
+		SetSort(bson.M{"createdAt": -1}).
+		SetSkip(skip).
+		SetLimit(int64(limit))
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var cards []*domain.ReportCard
+	if err = cursor.All(ctx, &cards); err != nil {
+		return nil, err
+	}
 	if cards == nil {
 		cards = []*domain.ReportCard{}
 	}

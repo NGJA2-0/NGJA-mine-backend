@@ -24,6 +24,7 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 	api := app.Group("/api/report-cards", middleware.Protected(jwtSecret))
 	api.Get("/search", handler.Search)
 	api.Get("/by-application/:applicationId", handler.GetByApplicationID)
+	api.Get("/", handler.ListSubmissions)
 	api.Post("/", handler.Create)
 }
 
@@ -35,7 +36,8 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 	card.FullName = strings.TrimSpace(c.FormValue("fullName"))
 	card.AccNumber = strings.TrimSpace(c.FormValue("accNumber"))
 	card.NIC = strings.TrimSpace(c.FormValue("nic"))
-	card.Grade = strings.TrimSpace(c.FormValue("grade"))
+	card.AppliedGrade = strings.TrimSpace(c.FormValue("appliedGrade"))
+	card.CurrentGrade = strings.TrimSpace(c.FormValue("currentGrade"))
 	card.StartDate = strings.TrimSpace(c.FormValue("startDate"))
 	card.EndDate = strings.TrimSpace(c.FormValue("endDate"))
 
@@ -58,7 +60,8 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 	checkEmpty(card.FullName, "fullName")
 	checkEmpty(card.AccNumber, "accNumber")
 	checkEmpty(card.NIC, "nic")
-	checkEmpty(card.Grade, "grade")
+	checkEmpty(card.AppliedGrade, "appliedGrade")
+	checkEmpty(card.CurrentGrade, "currentGrade")
 	checkEmpty(card.StartDate, "startDate")
 	checkEmpty(card.EndDate, "endDate")
 
@@ -134,5 +137,24 @@ func (h *ReportCardHandler) GetByApplicationID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	return c.Status(fiber.StatusOK).JSON(result)
+}
+func (h *ReportCardHandler) ListSubmissions(c *fiber.Ctx) error {
+	grade := c.Query("grade")
+
+	page, err := strconv.Atoi(c.Query("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(c.Query("limit", "10"))
+	if err != nil {
+		limit = 10
+	}
+
+	result, err := h.Usecase.ListSubmissions(c.Context(), grade, page, limit)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
 	return c.Status(fiber.StatusOK).JSON(result)
 }

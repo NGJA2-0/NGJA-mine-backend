@@ -14,7 +14,8 @@ type ReportCard struct {
 	FullName      string             `json:"fullName" bson:"fullName"`
 	AccNumber     string             `json:"accNumber" bson:"accNumber"`
 	NIC           string             `json:"nic" bson:"nic"`
-	Grade         string             `json:"grade" bson:"grade"`
+	AppliedGrade  string             `json:"appliedGrade" bson:"applied_grade"`
+	CurrentGrade  string             `json:"currentGrade" bson:"current_grade"`
 	RefNumber     string             `json:"refNumber,omitempty" bson:"refNumber,omitempty"`
 	PdfUrl        string             `json:"pdfUrl,omitempty" bson:"pdfUrl,omitempty"`
 	StartDate     string             `json:"startDate" bson:"startDate"`
@@ -31,7 +32,9 @@ type ReportCardSearchSuggestion struct {
 	FullName      string             `json:"fullName" bson:"fullName"`
 	AccNumber     string             `json:"accNumber" bson:"accNumber"`
 	NIC           string             `json:"nic" bson:"nic"`
-	Grade         string             `json:"grade" bson:"grade"`
+	AppliedGrade  string             `json:"appliedGrade" bson:"applied_grade"`
+	CurrentGrade  string             `json:"currentGrade" bson:"current_grade"`
+	RegionalOffice string             `json:"regionalOffice" bson:"regionalOffice"`
 	StartDate     string             `json:"startDate" bson:"startDate"`
 	EndDate       string             `json:"endDate" bson:"endDate"`
 	Amount        float64            `json:"amount" bson:"amount"`
@@ -54,6 +57,7 @@ type ReportCardRepository interface {
 	GetLatestRefNumber(ctx context.Context) (string, error)
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
+	ListSubmissions(ctx context.Context, grade string, year int, page int, limit int) (*PaginatedReportCards, error)
 }
 
 // ReportCardUsecase defines the business logic interface
@@ -61,4 +65,5 @@ type ReportCardUsecase interface {
 	Create(ctx context.Context, card *ReportCard) error
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
+	ListSubmissions(ctx context.Context, grade string, page int, limit int) (*PaginatedReportCards, error)
 }

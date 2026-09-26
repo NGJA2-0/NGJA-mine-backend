@@ -33,8 +33,11 @@ func (u *reportCardUsecase) Create(ctx context.Context, card *domain.ReportCard)
 	if strings.TrimSpace(card.NIC) == "" {
 		return errors.New("nic is required")
 	}
-	if strings.TrimSpace(card.Grade) == "" {
-		return errors.New("grade is required")
+	if strings.TrimSpace(card.AppliedGrade) == "" {
+    	return errors.New("appliedGrade is required")
+	}
+	if strings.TrimSpace(card.CurrentGrade) == "" {
+    	return errors.New("currentGrade is required")
 	}
 	if strings.TrimSpace(card.StartDate) == "" {
 		return errors.New("startDate is required")
@@ -113,4 +116,18 @@ func (u *reportCardUsecase) GetByApplicationID(ctx context.Context, applicationI
 	}
 
 	return u.repo.GetByApplicationID(ctx, applicationID, page, limit)
+}
+func (u *reportCardUsecase) ListSubmissions(ctx context.Context, grade string, page int, limit int) (*domain.PaginatedReportCards, error) {
+	switch limit {
+	case 10, 15, 20:
+		// valid
+	default:
+		limit = 10
+	}
+	if page < 1 {
+		page = 1
+	}
+
+	year := time.Now().Year()
+	return u.repo.ListSubmissions(ctx, grade, year, page, limit)
 }

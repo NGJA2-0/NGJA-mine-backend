@@ -74,6 +74,8 @@ func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*doma
 			{"applicantFullNameSinhala": bson.M{"$regex": query, "$options": "i"}},
 			{"bankAccountNumber": bson.M{"$regex": query, "$options": "i"}},
 			{"nic": bson.M{"$regex": query, "$options": "i"}},
+			{"grade":                        bson.M{"$regex": query, "$options": "i"}},
+			{"licenseRegionalOfficeAndZone": bson.M{"$regex": query, "$options": "i"}},
 		},
 	}
 
@@ -83,7 +85,8 @@ func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*doma
 			"applicantFullNameSinhala": 1,
 			"bankAccountNumber":        1,
 			"nic":                      1,
-			"grade":                    1,
+			"grade":                        1,
+			"licenseRegionalOfficeAndZone": 1,
 		})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)

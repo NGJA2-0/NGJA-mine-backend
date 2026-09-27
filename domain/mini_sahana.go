@@ -49,6 +49,16 @@ type MiniSahanaForm struct {
 	CreatedBy                    string                `json:"createdBy,omitempty" bson:"createdBy,omitempty"`
 	RefNumber                    string                `json:"refNumber,omitempty" bson:"refNumber,omitempty"`
 	CreatedAt                    time.Time             `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
+	UpdatedBy                    string                 `json:"updatedBy,omitempty" bson:"updatedBy,omitempty"`
+	Changes                      []MiniSahanaChangeEntry `json:"changes" bson:"changes"`
+}
+
+type MiniSahanaChangeEntry struct {
+	EditType   string             `json:"editType" bson:"editType"`     // "normal" or "acc_number"
+	ChangedBy  string             `json:"changedBy" bson:"changedBy"`
+	ChangedAt  time.Time          `json:"changedAt" bson:"changedAt"`
+	OldValues  map[string]interface{} `json:"oldValues" bson:"oldValues"`
+	NewValues  map[string]interface{} `json:"newValues" bson:"newValues"`
 }
 
 type MiniSahanaSearchSuggestion struct {

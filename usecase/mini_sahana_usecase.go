@@ -80,6 +80,8 @@ func (u *miniSahanaUsecase) Create(ctx context.Context, form *domain.MiniSahanaF
 
 	form.CreatedAt = time.Now()
 
+	form.Changes = []domain.MiniSahanaChangeEntry{}
+
 	return u.repo.Create(ctx, form)
 }
 

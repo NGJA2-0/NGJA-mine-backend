@@ -83,5 +83,6 @@ type MiniSahanaUsecase interface {
 	GetByID(ctx context.Context, id string) (*MiniSahanaForm, error)
 	Search(ctx context.Context, query string) ([]*MiniSahanaSearchSuggestion, error)
 	Update(ctx context.Context, id string, form *MiniSahanaForm, userID string) error
+	UpdateAccountNumber(ctx context.Context, id string, newAccountNumber string, userID string) error
 	Delete(ctx context.Context, id string) error
 }

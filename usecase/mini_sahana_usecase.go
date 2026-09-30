@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"   
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,6 +13,42 @@ import (
 
 	"my-fiber-app/domain"
 )
+
+// fields that are metadata, never part of a diff
+var diffExcludedFields = map[string]bool{
+	"id": true, "refNumber": true, "createdAt": true,
+	"createdBy": true, "updatedBy": true, "changes": true,
+}
+
+func toDiffMap(form *domain.MiniSahanaForm) (map[string]interface{}, error) {
+	data, err := json.Marshal(form)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// diffFields compares old vs new maps, skipping metadata fields, and returns
+// only the keys that actually changed.
+func diffFields(oldMap, newMap map[string]interface{}) (map[string]interface{}, map[string]interface{}) {
+	oldVals := map[string]interface{}{}
+	newVals := map[string]interface{}{}
+	for key, newVal := range newMap {
+		if diffExcludedFields[key] {
+			continue
+		}
+		oldVal := oldMap[key]
+		if !reflect.DeepEqual(oldVal, newVal) {
+			oldVals[key] = oldVal
+			newVals[key] = newVal
+		}
+	}
+	return oldVals, newVals
+}
 
 type miniSahanaUsecase struct {
 	repo     domain.MiniSahanaRepository
@@ -97,17 +135,15 @@ func (u *miniSahanaUsecase) Search(ctx context.Context, query string) ([]*domain
 }
 
 func (u *miniSahanaUsecase) Update(ctx context.Context, id string, form *domain.MiniSahanaForm, userID string) error {
-	// First fetch existing to get RefNumber and validate it exists
 	existing, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	// Validate same fields as Create
+	// ── existing validation block stays exactly as-is ──
 	form.NIC = strings.ToUpper(strings.TrimSpace(form.NIC))
 	oldNicRegex := regexp.MustCompile(`^[0-9]{9}[VX]$`)
 	newNicRegex := regexp.MustCompile(`^[0-9]{12}$`)
-
 	if !oldNicRegex.MatchString(form.NIC) && !newNicRegex.MatchString(form.NIC) {
 		return errors.New("nic format is invalid")
 	}
@@ -131,9 +167,17 @@ func (u *miniSahanaUsecase) Update(ctx context.Context, id string, form *domain.
 	if !hasValidCategory {
 		return errors.New("eligibilityCategory must contain at least one of 'a', 'b', or 'c'")
 	}
+	// ── end existing validation block ──
 
-	// Update RefNumber versioning
-	// If existing is "A1", new should be "A1.1". If existing is "A1.1", new should be "A1.2"
+	// ── ADD: Normal Edit can never change bankAccountNumber ──
+	form.BankAccountNumber = existing.BankAccountNumber
+
+	user, err := u.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return errors.New("failed to fetch user details")
+	}
+
+	// ── existing RefNumber versioning block stays exactly as-is ──
 	baseRef := existing.RefNumber
 	version := 0
 	if idx := strings.Index(baseRef, "."); idx != -1 {
@@ -145,11 +189,76 @@ func (u *miniSahanaUsecase) Update(ctx context.Context, id string, form *domain.
 	}
 	form.RefNumber = fmt.Sprintf("%s.%d", baseRef, version+1)
 
-	// Keep CreatedBy and CreatedAt from existing
+	form.CreatedBy = existing.CreatedBy
+	form.CreatedAt = existing.CreatedAt
+	// ── end existing block ──
+
+	// ── ADD: diff and append to Changes ──
+	oldMap, _ := toDiffMap(existing)
+	newMap, _ := toDiffMap(form)
+	oldVals, newVals := diffFields(oldMap, newMap)
+
+	form.Changes = existing.Changes
+	if len(newVals) > 0 {
+		form.Changes = append(form.Changes, domain.MiniSahanaChangeEntry{
+			EditType:  "normal",
+			ChangedBy: user.Name,
+			ChangedAt: time.Now(),
+			OldValues: oldVals,
+			NewValues: newVals,
+		})
+	}
+	form.UpdatedBy = user.Name
+	// ── end ADD ──
+
+	return u.repo.Update(ctx, id, form)
+}
+
+func (u *miniSahanaUsecase) UpdateAccountNumber(ctx context.Context, id string, newAccountNumber string, userID string) error {
+	existing, err := u.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	newAccountNumber = strings.TrimSpace(newAccountNumber)
+	if newAccountNumber == "" {
+		return errors.New("bankAccountNumber is required")
+	}
+
+	user, err := u.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return errors.New("failed to fetch user details")
+	}
+
+	form := *existing // shallow copy of every existing field
+	form.BankAccountNumber = newAccountNumber
+
+	baseRef := existing.RefNumber
+	version := 0
+	if idx := strings.Index(baseRef, "."); idx != -1 {
+		verStr := baseRef[idx+1:]
+		if v, err := strconv.Atoi(verStr); err == nil {
+			version = v
+		}
+		baseRef = baseRef[:idx]
+	}
+	form.RefNumber = fmt.Sprintf("%s.%d", baseRef, version+1)
+
+	form.Changes = existing.Changes
+	if existing.BankAccountNumber != newAccountNumber {
+		form.Changes = append(form.Changes, domain.MiniSahanaChangeEntry{
+			EditType:  "acc_number",
+			ChangedBy: user.Name,
+			ChangedAt: time.Now(),
+			OldValues: map[string]interface{}{"bankAccountNumber": existing.BankAccountNumber},
+			NewValues: map[string]interface{}{"bankAccountNumber": newAccountNumber},
+		})
+	}
+	form.UpdatedBy = user.Name
 	form.CreatedBy = existing.CreatedBy
 	form.CreatedAt = existing.CreatedAt
 
-	return u.repo.Update(ctx, id, form)
+	return u.repo.Update(ctx, id, &form)
 }
 
 func (u *miniSahanaUsecase) Delete(ctx context.Context, id string) error {

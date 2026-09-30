@@ -23,6 +23,7 @@ func NewMiniSahanaHandler(app *fiber.App, us domain.MiniSahanaUsecase, jwtSecret
 	api.Post("/", handler.Create)
 	api.Get("/:id", handler.GetByID)
 	api.Put("/:id", handler.Update)
+	api.Put("/:id/account-number", handler.UpdateAccountNumber)
 	api.Delete("/:id", handler.Delete)
 }
 
@@ -145,6 +146,25 @@ func (h *MiniSahanaHandler) Update(c *fiber.Ctx) error {
 		"id":        form.ID.Hex(),
 		"refNumber": form.RefNumber,
 	})
+}
+
+func (h *MiniSahanaHandler) UpdateAccountNumber(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var body struct {
+		BankAccountNumber string `json:"bankAccountNumber"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	userID := c.Locals("user_id").(string)
+	err := h.Usecase.UpdateAccountNumber(c.Context(), id, body.BankAccountNumber, userID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Account number updated successfully"})
 }
 
 func (h *MiniSahanaHandler) Delete(c *fiber.Ctx) error {

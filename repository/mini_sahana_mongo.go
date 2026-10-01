@@ -30,7 +30,9 @@ func NewMiniSahanaRepository(db *mongo.Database) domain.MiniSahanaRepository {
 }
 
 func (r *miniSahanaMongoRepo) Create(ctx context.Context, form *domain.MiniSahanaForm) error {
-	form.ID = primitive.NewObjectID()
+	if form.ID.IsZero() {
+		form.ID = primitive.NewObjectID()
+	}
 	_, err := r.collection.InsertOne(ctx, form)
 	return err
 }

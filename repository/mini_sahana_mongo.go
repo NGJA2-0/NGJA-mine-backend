@@ -136,6 +136,7 @@ func (r *miniSahanaMongoRepo) Delete(ctx context.Context, id string) error {
 }
 
 func (r *miniSahanaMongoRepo) GetStats(ctx context.Context) (*domain.MiniSahanaStats, error) {
+	thisYear := strconv.Itoa(time.Now().Year())
 	pipeline := mongo.Pipeline{
 		{{Key: "$facet", Value: bson.D{
 			{Key: "total", Value: bson.A{
@@ -148,6 +149,8 @@ func (r *miniSahanaMongoRepo) GetStats(ctx context.Context) (*domain.MiniSahanaS
 				}}},
 			}},
 			{Key: "byGrade", Value: bson.A{
+				// only this year's applications
+				bson.D{{Key: "$match", Value: bson.D{{Key: "year", Value: thisYear}}}},
 				bson.D{{Key: "$group", Value: bson.D{
 					{Key: "_id", Value: "$grade"},
 					{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},

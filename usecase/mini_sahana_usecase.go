@@ -393,3 +393,36 @@ func nextRef(ref string) string {
 	}
 	return fmt.Sprintf("%s.%d", base, version+1)
 }
+
+func (u *miniSahanaUsecase) GetStats(ctx context.Context) (*domain.MiniSahanaStats, error) {
+	raw, err := u.repo.GetStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	yearMap := map[string]int64{}
+	for _, y := range raw.ByYear {
+		yearMap[y.Year] += y.Count
+	}
+	gradeMap := map[string]int64{}
+	for _, g := range raw.ByGrade {
+		gradeMap[g.Grade] += g.Count
+	}
+
+	// latest 5 calendar years, newest first
+	thisYear := time.Now().Year()
+	byYear := make([]domain.MiniSahanaYearCount, 0, 5)
+	for i := 0; i < 5; i++ {
+		y := strconv.Itoa(thisYear - i)
+		byYear = append(byYear, domain.MiniSahanaYearCount{Year: y, Count: yearMap[y]})
+	}
+
+	// grades 6..13
+	byGrade := make([]domain.MiniSahanaGradeCount, 0, 8)
+	for g := 6; g <= 13; g++ {
+		k := strconv.Itoa(g)
+		byGrade = append(byGrade, domain.MiniSahanaGradeCount{Grade: k, Count: gradeMap[k]})
+	}
+
+	return &domain.MiniSahanaStats{Total: raw.Total, ByYear: byYear, ByGrade: byGrade}, nil
+}

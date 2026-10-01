@@ -29,6 +29,7 @@ func NewMiniSahanaHandler(app *fiber.App, us domain.MiniSahanaUsecase, jwtSecret
 
 	api := app.Group("/api/mini-sahana-form", middleware.Protected(jwtSecret))
 	api.Get("/search", handler.Search)
+	api.Get("/stats", handler.Stats)
 	api.Post("/", handler.Create)
 	api.Get("/:id/documents/:key/versions/:version", handler.GetDocument)
 	api.Put("/:id/documents/:key", handler.UpdateDocument)
@@ -271,4 +272,12 @@ func (h *MiniSahanaHandler) UpdateDocument(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.Status(fiber.StatusOK).JSON(updated)
+}
+
+func (h *MiniSahanaHandler) Stats(c *fiber.Ctx) error {
+	stats, err := h.Usecase.GetStats(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(stats)
 }

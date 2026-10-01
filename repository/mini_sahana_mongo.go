@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"my-fiber-app/domain"
 
@@ -132,4 +133,63 @@ func (r *miniSahanaMongoRepo) Delete(ctx context.Context, id string) error {
 		return errors.New("record not found")
 	}
 	return nil
+}
+
+func (r *miniSahanaMongoRepo) GetStats(ctx context.Context) (*domain.MiniSahanaStats, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$facet", Value: bson.D{
+			{Key: "total", Value: bson.A{
+				bson.D{{Key: "$count", Value: "n"}},
+			}},
+			{Key: "byYear", Value: bson.A{
+				bson.D{{Key: "$group", Value: bson.D{
+					{Key: "_id", Value: "$year"},
+					{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+				}}},
+			}},
+			{Key: "byGrade", Value: bson.A{
+				bson.D{{Key: "$group", Value: bson.D{
+					{Key: "_id", Value: "$grade"},
+					{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+				}}},
+			}},
+		}}},
+	}
+
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	type bucket struct {
+		ID    string `bson:"_id"`
+		Count int64  `bson:"count"`
+	}
+	var out []struct {
+		Total   []struct{ N int64 `bson:"n"` } `bson:"total"`
+		ByYear  []bucket                       `bson:"byYear"`
+		ByGrade []bucket                       `bson:"byGrade"`
+	}
+	if err := cursor.All(ctx, &out); err != nil {
+		return nil, err
+	}
+
+	stats := &domain.MiniSahanaStats{
+		ByYear:  []domain.MiniSahanaYearCount{},
+		ByGrade: []domain.MiniSahanaGradeCount{},
+	}
+	if len(out) == 0 {
+		return stats, nil
+	}
+	if len(out[0].Total) > 0 {
+		stats.Total = out[0].Total[0].N
+	}
+	for _, b := range out[0].ByYear {
+		stats.ByYear = append(stats.ByYear, domain.MiniSahanaYearCount{Year: strings.TrimSpace(b.ID), Count: b.Count})
+	}
+	for _, b := range out[0].ByGrade {
+		stats.ByGrade = append(stats.ByGrade, domain.MiniSahanaGradeCount{Grade: strings.TrimSpace(b.ID), Count: b.Count})
+	}
+	return stats, nil
 }

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -51,6 +52,7 @@ type MiniSahanaForm struct {
 	CreatedAt                    time.Time             `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
 	UpdatedBy                    string                 `json:"updatedBy,omitempty" bson:"updatedBy,omitempty"`
 	Changes                      []MiniSahanaChangeEntry `json:"changes" bson:"changes"`
+	Documents 					[]MiniSahanaDocument `json:"documents" bson:"documents"`
 }
 
 type MiniSahanaChangeEntry struct {
@@ -79,10 +81,57 @@ type MiniSahanaRepository interface {
 }
 
 type MiniSahanaUsecase interface {
-	Create(ctx context.Context, form *MiniSahanaForm, userID string) error
+	Create(ctx context.Context, form *MiniSahanaForm, userID string, files map[string]*DocUpload) error
 	GetByID(ctx context.Context, id string) (*MiniSahanaForm, error)
 	Search(ctx context.Context, query string) ([]*MiniSahanaSearchSuggestion, error)
 	Update(ctx context.Context, id string, form *MiniSahanaForm, userID string) error
 	UpdateAccountNumber(ctx context.Context, id string, newAccountNumber string, userID string) error
+	UpdateDocument(ctx context.Context, id, docKey string, file *DocUpload, userID string) (*MiniSahanaForm, error)
+	OpenDocument(ctx context.Context, id, docKey string, version int) (*MiniSahanaDocVersion, error)
 	Delete(ctx context.Context, id string) error
+}
+
+const DocumentsRoot = "minisahana_documents"
+
+func DocumentDir(appID string) string { return DocumentsRoot + "/" + appID }
+
+func DocumentPath(appID, docKey string, version int) string {
+	return fmt.Sprintf("%s/%s/%s_v%d.pdf", DocumentsRoot, appID, docKey, version)
+}
+
+type MiniSahanaDocumentSlot struct {
+	Key       string
+	FormField string // multipart field name sent by the frontend
+	Label     string
+	Required  bool
+}
+
+var MiniSahanaDocumentSlots = []MiniSahanaDocumentSlot{
+	{"hard_copy", "hardCopy", "Submitted Hard Copy", true},
+	{"bank_passbook", "passbook", "Copy of the Bank Passbook", true},
+	{"birth_certificate", "birthCert", "Copy of the Birth Certificate", true},
+	{"additional", "additional", "Additional Document", false},
+}
+
+type MiniSahanaDocVersion struct {
+	Version    int       `json:"version" bson:"version"`
+	FileName   string    `json:"fileName" bson:"fileName"`
+	StoredPath string    `json:"-" bson:"storedPath"` // never sent to the browser
+	Size       int64     `json:"size" bson:"size"`
+	UploadedBy string    `json:"uploadedBy" bson:"uploadedBy"`
+	UploadedAt time.Time `json:"uploadedAt" bson:"uploadedAt"`
+}
+
+type MiniSahanaDocument struct {
+	Key            string                 `json:"key" bson:"key"`
+	Label          string                 `json:"label" bson:"label"`
+	CurrentVersion int                    `json:"currentVersion" bson:"currentVersion"`
+	Versions       []MiniSahanaDocVersion `json:"versions" bson:"versions"`
+}
+
+// Keeps the usecase free of Fiber: Save is the handler's c.SaveFile wrapper.
+type DocUpload struct {
+	FileName string
+	Size     int64
+	Save     func(relPath string) error
 }

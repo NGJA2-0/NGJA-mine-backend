@@ -22,7 +22,9 @@ func main() {
 	db := config.ConnectDB(env)
 
 	// Initialize Fiber app
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 50 * 1024 * 1024, // default 4MB is too small for 3–4 PDFs
+	})
 
 	// Global Middleware
 	app.Use(logger.New())

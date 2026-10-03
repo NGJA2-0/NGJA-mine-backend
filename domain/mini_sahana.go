@@ -128,7 +128,7 @@ var MiniSahanaDocumentSlots = []MiniSahanaDocumentSlot{
 	{"hard_copy", "hardCopy", "Submitted Hard Copy", true},
 	{"bank_passbook", "passbook", "Copy of the Bank Passbook", true},
 	{"birth_certificate", "birthCert", "Copy of the Birth Certificate", true},
-	{"additional", "additional", "Additional Document", false},
+	{"additional", "additional", "O/L Certificate", false},
 }
 
 type MiniSahanaDocVersion struct {

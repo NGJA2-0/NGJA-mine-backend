@@ -124,6 +124,15 @@ func (u *miniSahanaUsecase) Create(ctx context.Context, form *domain.MiniSahanaF
 		}
 	}
 
+	// O/L certificate: required for grade 12 only, and ignored for other grades
+	if strings.TrimSpace(form.Grade) == "12" {
+		if files["additional"] == nil {
+			return errors.New("O/L Certificate is required for grade 12")
+		}
+	} else {
+		delete(files, "additional")
+	}
+
 	form.ID = primitive.NewObjectID()
 	appID := form.ID.Hex()
 	form.CreatedAt = time.Now()

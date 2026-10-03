@@ -71,6 +71,22 @@ type MiniSahanaSearchSuggestion struct {
 	Grade                    string             `json:"grade" bson:"grade"`
 }
 
+type MiniSahanaYearCount struct {
+	Year  string `json:"year"`
+	Count int64  `json:"count"`
+}
+
+type MiniSahanaGradeCount struct {
+	Grade string `json:"grade"`
+	Count int64  `json:"count"`
+}
+
+type MiniSahanaStats struct {
+	Total   int64                  `json:"total"`
+	ByYear  []MiniSahanaYearCount  `json:"byYear"`
+	ByGrade []MiniSahanaGradeCount `json:"byGrade"`
+}
+
 type MiniSahanaRepository interface {
 	Create(ctx context.Context, form *MiniSahanaForm) error
 	GetLatestRefNumber(ctx context.Context) (string, error)
@@ -78,6 +94,7 @@ type MiniSahanaRepository interface {
 	Search(ctx context.Context, query string) ([]*MiniSahanaSearchSuggestion, error)
 	Update(ctx context.Context, id string, form *MiniSahanaForm) error
 	Delete(ctx context.Context, id string) error
+	GetStats(ctx context.Context) (*MiniSahanaStats, error)
 }
 
 type MiniSahanaUsecase interface {
@@ -89,6 +106,7 @@ type MiniSahanaUsecase interface {
 	UpdateDocument(ctx context.Context, id, docKey string, file *DocUpload, userID string) (*MiniSahanaForm, error)
 	OpenDocument(ctx context.Context, id, docKey string, version int) (*MiniSahanaDocVersion, error)
 	Delete(ctx context.Context, id string) error
+	GetStats(ctx context.Context) (*MiniSahanaStats, error)
 }
 
 const DocumentsRoot = "minisahana_documents"
@@ -110,7 +128,7 @@ var MiniSahanaDocumentSlots = []MiniSahanaDocumentSlot{
 	{"hard_copy", "hardCopy", "Submitted Hard Copy", true},
 	{"bank_passbook", "passbook", "Copy of the Bank Passbook", true},
 	{"birth_certificate", "birthCert", "Copy of the Birth Certificate", true},
-	{"additional", "additional", "Additional Document", false},
+	{"additional", "additional", "O/L Certificate", false},
 }
 
 type MiniSahanaDocVersion struct {

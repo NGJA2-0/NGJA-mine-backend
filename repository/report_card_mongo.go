@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"time"
+	"errors"
 
 	"my-fiber-app/domain"
 
@@ -193,4 +194,75 @@ func (r *reportCardMongoRepo) ListSubmissions(ctx context.Context, grade string,
 		Limit:      limit,
 		TotalPages: totalPages,
 	}, nil
+}
+
+func (r *reportCardMongoRepo) GetOLCertificate(ctx context.Context, applicationID string) (*domain.DocumentVersion, error) {
+	oid, err := primitive.ObjectIDFromHex(applicationID)
+	if err != nil {
+		return nil, errors.New("invalid applicationId")
+	}
+
+	var app struct {
+		Documents []struct {
+			Key            string                   `bson:"key"`
+			CurrentVersion int32                    `bson:"currentVersion"`
+			Versions       []domain.DocumentVersion `bson:"versions"`
+		} `bson:"documents"`
+	}
+
+	err = r.db.Collection("applications").
+		FindOne(ctx, bson.M{"_id": oid}, options.FindOne().SetProjection(bson.M{"documents": 1})).
+		Decode(&app)
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	for _, d := range app.Documents {
+		if d.Key != domain.OLCertificateKey {
+			continue
+		}
+		for i := range d.Versions {
+			if d.Versions[i].Version == d.CurrentVersion {
+				return &d.Versions[i], nil
+			}
+		}
+	}
+	return nil, nil // no O/L certificate on this application
+}
+
+func (r *reportCardMongoRepo) AddOLCertificate(ctx context.Context, applicationID string, v domain.DocumentVersion) error {
+	oid, err := primitive.ObjectIDFromHex(applicationID)
+	if err != nil {
+		return errors.New("invalid applicationId")
+	}
+
+	// Only matches if the application doesn't already have an O/L certificate.
+	filter := bson.M{"_id": oid, "documents.key": bson.M{"$ne": domain.OLCertificateKey}}
+	update := bson.M{"$push": bson.M{
+		"documents": bson.M{
+			"key":            domain.OLCertificateKey,
+			"label":          "Copy of the O/L Certificate",
+			"currentVersion": int32(1),
+			"versions":       bson.A{v},
+		},
+		"changes": bson.M{
+			"editType":  "document",
+			"changedBy": v.UploadedBy,
+			"changedAt": v.UploadedAt,
+			"oldValues": bson.M{"documents.ol_certificate": "-"},
+			"newValues": bson.M{"documents.ol_certificate": "v1 · " + v.FileName},
+		},
+	}}
+
+	res, err := r.db.Collection("applications").UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return errors.New("application not found or O/L certificate already exists")
+	}
+	return nil
 }

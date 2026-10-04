@@ -51,6 +51,17 @@ type PaginatedReportCards struct {
 	TotalPages int           `json:"totalPages"`
 }
 
+const OLCertificateKey = "additional"
+
+type DocumentVersion struct {
+	Version    int32     `json:"version" bson:"version"`
+	FileName   string    `json:"fileName" bson:"fileName"`
+	StoredPath string    `json:"-" bson:"storedPath"`
+	Size       int64     `json:"size" bson:"size"`
+	UploadedBy string    `json:"uploadedBy" bson:"uploadedBy"`
+	UploadedAt time.Time `json:"uploadedAt" bson:"uploadedAt"`
+}
+
 // ReportCardRepository defines the data access interface
 type ReportCardRepository interface {
 	Create(ctx context.Context, card *ReportCard) error
@@ -58,6 +69,8 @@ type ReportCardRepository interface {
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
 	ListSubmissions(ctx context.Context, grade string, year int, page int, limit int) (*PaginatedReportCards, error)
+	GetOLCertificate(ctx context.Context, applicationID string) (*DocumentVersion, error)
+	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
 }
 
 // ReportCardUsecase defines the business logic interface
@@ -66,4 +79,6 @@ type ReportCardUsecase interface {
 	Search(ctx context.Context, query string) ([]*ReportCardSearchSuggestion, error)
 	GetByApplicationID(ctx context.Context, applicationID string, page int, limit int) (*PaginatedReportCards, error)
 	ListSubmissions(ctx context.Context, grade string, page int, limit int) (*PaginatedReportCards, error)
+	GetOLCertificate(ctx context.Context, applicationID string) (*DocumentVersion, error)
+	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
 }

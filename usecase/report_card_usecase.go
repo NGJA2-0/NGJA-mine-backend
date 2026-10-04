@@ -131,3 +131,14 @@ func (u *reportCardUsecase) ListSubmissions(ctx context.Context, grade string, p
 	year := time.Now().Year()
 	return u.repo.ListSubmissions(ctx, grade, year, page, limit)
 }
+
+func (u *reportCardUsecase) GetOLCertificate(ctx context.Context, id string) (*domain.DocumentVersion, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, errors.New("applicationId is required")
+	}
+	return u.repo.GetOLCertificate(ctx, id)
+}
+
+func (u *reportCardUsecase) AddOLCertificate(ctx context.Context, id string, v domain.DocumentVersion) error {
+	return u.repo.AddOLCertificate(ctx, id, v)
+}

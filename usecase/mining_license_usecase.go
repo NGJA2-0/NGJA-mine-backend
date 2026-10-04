@@ -44,6 +44,12 @@ func (u *miningLicenseUsecase) Submit(ctx context.Context, license *domain.Mecha
 	if len(license.GPSPoints) == 0 {
 		return nil, errors.New("at least one gpsPoint is required")
 	}
+	if _, ok := parseGPSFloat(strings.TrimSpace(license.GPSPoints[0].Latitude)); !ok {
+		return nil, errors.New("the first gpsPoint must have a valid latitude")
+	}
+	if _, ok := parseGPSFloat(strings.TrimSpace(license.GPSPoints[0].Longitude)); !ok {
+		return nil, errors.New("the first gpsPoint must have a valid longitude")
+	}
 	if license.LandName == "" {
 		return nil, errors.New("landName is required")
 	}

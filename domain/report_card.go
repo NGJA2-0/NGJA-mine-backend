@@ -23,7 +23,16 @@ type ReportCard struct {
 	Amount        float64            `json:"amount" bson:"amount"`
 	TotalDuration int                `json:"totalDuration" bson:"totalDuration"`
 	TotalAmount   float64            `json:"totalAmount" bson:"totalAmount"`
+	Months        []ReportCardMonth  `json:"months,omitempty" bson:"months,omitempty"`
 	CreatedAt     time.Time          `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
+}
+
+// ReportCardMonth is one payable month of a report card
+type ReportCardMonth struct {
+	Year  int    `json:"year" bson:"year"`
+	Month int    `json:"month" bson:"month"`
+	Label string `json:"label" bson:"label"` // e.g. "2026-October"
+	Paid  bool   `json:"paid" bson:"paid"`
 }
 
 // ReportCardSearchSuggestion is the response shape for search/dropdown results

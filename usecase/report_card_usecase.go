@@ -164,15 +164,18 @@ func (u *reportCardUsecase) AddOLCertificate(ctx context.Context, id string, v d
 	return u.repo.AddOLCertificate(ctx, id, v)
 }
 
-func validatePeriod(year int, month int) error {
-	if year < 2000 || year > 2100 || month < 1 || month > 12 {
+func validatePeriod(year int, fromMonth int, toMonth int) error {
+	if year < 2000 || year > 2100 ||
+		fromMonth < 1 || fromMonth > 12 ||
+		toMonth < 1 || toMonth > 12 ||
+		fromMonth > toMonth {
 		return domain.ErrInvalidPeriod
 	}
 	return nil
 }
 
-func (u *reportCardUsecase) ListByMonth(ctx context.Context, year int, month int, grade string, page int, limit int) (*domain.PaginatedMonthReportCards, error) {
-	if err := validatePeriod(year, month); err != nil {
+func (u *reportCardUsecase) ListByMonth(ctx context.Context, year int, fromMonth int, toMonth int, grade string, page int, limit int) (*domain.PaginatedMonthReportCards, error) {
+	if err := validatePeriod(year, fromMonth, toMonth); err != nil {
 		return nil, err
 	}
 
@@ -186,19 +189,26 @@ func (u *reportCardUsecase) ListByMonth(ctx context.Context, year int, month int
 		page = 1
 	}
 
-	cards, total, err := u.repo.ListByMonth(ctx, year, month, strings.TrimSpace(grade), page, limit)
+	cards, total, err := u.repo.ListByMonth(ctx, year, fromMonth, toMonth, strings.TrimSpace(grade), page, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	rows := make([]*domain.ReportCardMonthRow, 0, len(cards))
 	for _, card := range cards {
-		row := &domain.ReportCardMonthRow{ReportCard: *card}
-		for i := range card.Months {
-			if card.Months[i].Year == year && card.Months[i].Month == month {
-				m := card.Months[i]
-				row.SelectedMonth = &m
-				break
+		row := &domain.ReportCardMonthRow{
+			ReportCard:     *card,
+			SelectedMonths: []domain.ReportCardMonth{},
+		}
+		for _, m := range card.Months {
+			if m.Year != year || m.Month < fromMonth || m.Month > toMonth {
+				continue
+			}
+			row.SelectedMonths = append(row.SelectedMonths, m)
+			if m.Paid {
+				row.PaidCount++
+			} else {
+				row.UnpaidCount++
 			}
 		}
 		rows = append(rows, row)
@@ -214,8 +224,8 @@ func (u *reportCardUsecase) ListByMonth(ctx context.Context, year int, month int
 	}, nil
 }
 
-func (u *reportCardUsecase) PayMonth(ctx context.Context, id string, year int, month int, userID string) (*domain.ReportCardMonth, error) {
-	if err := validatePeriod(year, month); err != nil {
+func (u *reportCardUsecase) PayMonths(ctx context.Context, id string, year int, fromMonth int, toMonth int, userID string) (*domain.PayMonthsResult, error) {
+	if err := validatePeriod(year, fromMonth, toMonth); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(id) == "" {
@@ -229,17 +239,19 @@ func (u *reportCardUsecase) PayMonth(ctx context.Context, id string, year int, m
 	}
 
 	paidAt := time.Now().UTC()
-	if err := u.repo.MarkMonthPaid(ctx, id, year, month, user.Name, userID, paidAt); err != nil {
+	paid, alreadyPaid, err := u.repo.MarkMonthsPaid(ctx, id, year, fromMonth, toMonth, user.Name, userID, paidAt)
+	if err != nil {
 		return nil, err
 	}
 
-	return &domain.ReportCardMonth{
-		Year:     year,
-		Month:    month,
-		Label:    fmt.Sprintf("%d-%s", year, time.Month(month).String()),
-		Paid:     true,
-		PaidAt:   &paidAt,
-		PaidBy:   user.Name,
-		PaidByID: userID,
+	return &domain.PayMonthsResult{
+		Year:             year,
+		FromMonth:        fromMonth,
+		ToMonth:          toMonth,
+		PaidMonths:       paid,
+		PaidCount:        len(paid),
+		AlreadyPaidCount: alreadyPaid,
+		PaidAt:           paidAt,
+		PaidBy:           user.Name,
 	}, nil
 }

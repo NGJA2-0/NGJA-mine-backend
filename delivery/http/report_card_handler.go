@@ -29,7 +29,7 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 	api := app.Group("/api/report-cards", middleware.Protected(jwtSecret))
 	api.Get("/search", handler.Search)
 	api.Get("/by-month", handler.ListByMonth)
-	api.Patch("/:id/months/:year/:month/pay", handler.PayMonth)
+	api.Patch("/:id/pay", handler.PayMonths)
 	api.Get("/by-application/:applicationId", handler.GetByApplicationID)
 	api.Get("/", handler.ListSubmissions)
 	api.Post("/", handler.Create)
@@ -247,10 +247,22 @@ func (h *ReportCardHandler) ListByMonth(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "year is required and must be a number"})
 	}
-	month, err := strconv.Atoi(c.Query("month"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "month is required and must be a number (1-12)"})
+
+	fromStr, toStr := c.Query("fromMonth"), c.Query("toMonth")
+	if fromStr == "" && toStr == "" {
+		// single-month shortcut: ?month=6 is the same as fromMonth=6&toMonth=6
+		fromStr = c.Query("month")
+		toStr = fromStr
 	}
+	fromMonth, err := strconv.Atoi(fromStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "fromMonth is required and must be a number (1-12)"})
+	}
+	toMonth, err := strconv.Atoi(toStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "toMonth is required and must be a number (1-12)"})
+	}
+
 	grade := strings.TrimSpace(c.Query("grade")) // optional, matched against current_grade
 
 	page, err := strconv.Atoi(c.Query("page", "1"))
@@ -262,7 +274,7 @@ func (h *ReportCardHandler) ListByMonth(c *fiber.Ctx) error {
 		limit = 10
 	}
 
-	result, err := h.Usecase.ListByMonth(c.Context(), year, month, grade, page, limit)
+	result, err := h.Usecase.ListByMonth(c.Context(), year, fromMonth, toMonth, grade, page, limit)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPeriod) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
@@ -272,20 +284,20 @@ func (h *ReportCardHandler) ListByMonth(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(result)
 }
 
-func (h *ReportCardHandler) PayMonth(c *fiber.Ctx) error {
-	year, err := strconv.Atoi(c.Params("year"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "year must be a number"})
+func (h *ReportCardHandler) PayMonths(c *fiber.Ctx) error {
+	var body struct {
+		Year      int `json:"year"`
+		FromMonth int `json:"fromMonth"`
+		ToMonth   int `json:"toMonth"`
 	}
-	month, err := strconv.Atoi(c.Params("month"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "month must be a number (1-12)"})
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
 
 	// Set by middleware.Protected from the JWT
 	userID, _ := c.Locals("user_id").(string)
 
-	paid, err := h.Usecase.PayMonth(c.Context(), c.Params("id"), year, month, userID)
+	result, err := h.Usecase.PayMonths(c.Context(), c.Params("id"), body.Year, body.FromMonth, body.ToMonth, userID)
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidReportCardID), errors.Is(err, domain.ErrInvalidPeriod):
@@ -302,7 +314,7 @@ func (h *ReportCardHandler) PayMonth(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Month marked as paid",
-		"month":   paid,
+		"message": "Months marked as paid",
+		"result":  result,
 	})
 }

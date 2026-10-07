@@ -10,9 +10,9 @@ import (
 
 var (
 	ErrInvalidReportCardID = errors.New("invalid report card id")
-	ErrInvalidPeriod       = errors.New("year must be between 2000 and 2100 and month must be between 1 and 12")
-	ErrMonthNotFound       = errors.New("report card or month not found")
-	ErrMonthAlreadyPaid    = errors.New("this month is already paid")
+	ErrInvalidPeriod       = errors.New("year must be between 2000 and 2100, months must be between 1 and 12, and fromMonth must not be after toMonth")
+	ErrMonthNotFound       = errors.New("report card not found, or it has no months in this range")
+	ErrMonthAlreadyPaid    = errors.New("all months in this range are already paid")
 	ErrUserNotFound        = errors.New("user not found")
 )
 
@@ -75,7 +75,21 @@ type PaginatedReportCards struct {
 // ReportCardMonthRow is a report card plus the status of the month that was searched
 type ReportCardMonthRow struct {
 	ReportCard
-	SelectedMonth *ReportCardMonth `json:"selectedMonth"`
+	SelectedMonths []ReportCardMonth `json:"selectedMonths"` // the card's months inside the searched range
+	PaidCount      int               `json:"paidCount"`
+	UnpaidCount    int               `json:"unpaidCount"`
+}
+
+// PayMonthsResult is the response of a pay action
+type PayMonthsResult struct {
+	Year             int               `json:"year"`
+	FromMonth        int               `json:"fromMonth"`
+	ToMonth          int               `json:"toMonth"`
+	PaidMonths       []ReportCardMonth `json:"paidMonths"`       // months switched to paid by this click
+	PaidCount        int               `json:"paidCount"`
+	AlreadyPaidCount int               `json:"alreadyPaidCount"` // months in range that were already paid (left untouched)
+	PaidAt           time.Time         `json:"paidAt"`
+	PaidBy           string            `json:"paidBy"`
 }
 
 // PaginatedMonthReportCards is the response of the year/month search
@@ -107,8 +121,8 @@ type ReportCardRepository interface {
 	ListSubmissions(ctx context.Context, grade string, year int, page int, limit int) (*PaginatedReportCards, error)
 	GetOLCertificate(ctx context.Context, applicationID string) (*DocumentVersion, error)
 	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
-	ListByMonth(ctx context.Context, year int, month int, grade string, page int, limit int) ([]*ReportCard, int64, error)
-	MarkMonthPaid(ctx context.Context, id string, year int, month int, paidBy string, paidByID string, paidAt time.Time) error
+	ListByMonth(ctx context.Context, year int, fromMonth int, toMonth int, grade string, page int, limit int) ([]*ReportCard, int64, error)
+	MarkMonthsPaid(ctx context.Context, id string, year int, fromMonth int, toMonth int, paidBy string, paidByID string, paidAt time.Time) ([]ReportCardMonth, int, error)
 }
 
 // ReportCardUsecase defines the business logic interface
@@ -119,6 +133,6 @@ type ReportCardUsecase interface {
 	ListSubmissions(ctx context.Context, grade string, page int, limit int) (*PaginatedReportCards, error)
 	GetOLCertificate(ctx context.Context, applicationID string) (*DocumentVersion, error)
 	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
-	ListByMonth(ctx context.Context, year int, month int, grade string, page int, limit int) (*PaginatedMonthReportCards, error)
-	PayMonth(ctx context.Context, id string, year int, month int, userID string) (*ReportCardMonth, error)
+	ListByMonth(ctx context.Context, year int, fromMonth int, toMonth int, grade string, page int, limit int) (*PaginatedMonthReportCards, error)
+	PayMonths(ctx context.Context, id string, year int, fromMonth int, toMonth int, userID string) (*PayMonthsResult, error)
 }

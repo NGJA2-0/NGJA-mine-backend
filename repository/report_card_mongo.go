@@ -266,3 +266,76 @@ func (r *reportCardMongoRepo) AddOLCertificate(ctx context.Context, applicationI
 	}
 	return nil
 }
+
+// ListByMonth returns report cards that contain the given year+month, optionally filtered by current grade.
+func (r *reportCardMongoRepo) ListByMonth(ctx context.Context, year int, month int, grade string, page int, limit int) ([]*domain.ReportCard, int64, error) {
+	filter := bson.M{
+		"months": bson.M{"$elemMatch": bson.M{"year": year, "month": month}},
+	}
+	if strings.TrimSpace(grade) != "" {
+		filter["current_grade"] = grade
+	}
+
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	opts := options.Find().
+		SetSort(bson.M{"createdAt": -1}).
+		SetSkip(int64((page - 1) * limit)).
+		SetLimit(int64(limit))
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var cards []*domain.ReportCard
+	if err = cursor.All(ctx, &cards); err != nil {
+		return nil, 0, err
+	}
+	return cards, total, nil
+}
+
+// MarkMonthPaid sets paid=true on ONE month of ONE report card. Other months are untouched.
+// It only matches while that month is still unpaid, so a paid month can never be overwritten.
+func (r *reportCardMongoRepo) MarkMonthPaid(ctx context.Context, id string, year int, month int, paidBy string, paidByID string, paidAt time.Time) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return domain.ErrInvalidReportCardID
+	}
+
+	filter := bson.M{
+		"_id":    oid,
+		"months": bson.M{"$elemMatch": bson.M{"year": year, "month": month, "paid": false}},
+	}
+	update := bson.M{"$set": bson.M{
+		"months.$.paid":     true,
+		"months.$.paidAt":   paidAt,
+		"months.$.paidBy":   paidBy,
+		"months.$.paidById": paidByID,
+	}}
+
+	res, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount > 0 {
+		return nil
+	}
+
+	// Nothing updated: either the month doesn't exist, or it is already paid.
+	exists, err := r.collection.CountDocuments(ctx, bson.M{
+		"_id":    oid,
+		"months": bson.M{"$elemMatch": bson.M{"year": year, "month": month}},
+	})
+	if err != nil {
+		return err
+	}
+	if exists > 0 {
+		return domain.ErrMonthAlreadyPaid
+	}
+	return domain.ErrMonthNotFound
+}

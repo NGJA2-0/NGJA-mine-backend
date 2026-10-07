@@ -2,9 +2,18 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	ErrInvalidReportCardID = errors.New("invalid report card id")
+	ErrInvalidPeriod       = errors.New("year must be between 2000 and 2100 and month must be between 1 and 12")
+	ErrMonthNotFound       = errors.New("report card or month not found")
+	ErrMonthAlreadyPaid    = errors.New("this month is already paid")
+	ErrUserNotFound        = errors.New("user not found")
 )
 
 // ReportCard represents a report card document stored in MongoDB
@@ -29,10 +38,13 @@ type ReportCard struct {
 
 // ReportCardMonth is one payable month of a report card
 type ReportCardMonth struct {
-	Year  int    `json:"year" bson:"year"`
-	Month int    `json:"month" bson:"month"`
-	Label string `json:"label" bson:"label"` // e.g. "2026-October"
-	Paid  bool   `json:"paid" bson:"paid"`
+	Year     int        `json:"year" bson:"year"`
+	Month    int        `json:"month" bson:"month"`
+	Label    string     `json:"label" bson:"label"` // e.g. "2026-October"
+	Paid     bool       `json:"paid" bson:"paid"`
+	PaidAt   *time.Time `json:"paidAt,omitempty" bson:"paidAt,omitempty"`
+	PaidBy   string     `json:"paidBy,omitempty" bson:"paidBy,omitempty"`
+	PaidByID string     `json:"paidById,omitempty" bson:"paidById,omitempty"`
 }
 
 // ReportCardSearchSuggestion is the response shape for search/dropdown results
@@ -60,6 +72,21 @@ type PaginatedReportCards struct {
 	TotalPages int           `json:"totalPages"`
 }
 
+// ReportCardMonthRow is a report card plus the status of the month that was searched
+type ReportCardMonthRow struct {
+	ReportCard
+	SelectedMonth *ReportCardMonth `json:"selectedMonth"`
+}
+
+// PaginatedMonthReportCards is the response of the year/month search
+type PaginatedMonthReportCards struct {
+	Data       []*ReportCardMonthRow `json:"data"`
+	Total      int64                 `json:"total"`
+	Page       int                   `json:"page"`
+	Limit      int                   `json:"limit"`
+	TotalPages int                   `json:"totalPages"`
+}
+
 const OLCertificateKey = "additional"
 
 type DocumentVersion struct {
@@ -80,6 +107,8 @@ type ReportCardRepository interface {
 	ListSubmissions(ctx context.Context, grade string, year int, page int, limit int) (*PaginatedReportCards, error)
 	GetOLCertificate(ctx context.Context, applicationID string) (*DocumentVersion, error)
 	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
+	ListByMonth(ctx context.Context, year int, month int, grade string, page int, limit int) ([]*ReportCard, int64, error)
+	MarkMonthPaid(ctx context.Context, id string, year int, month int, paidBy string, paidByID string, paidAt time.Time) error
 }
 
 // ReportCardUsecase defines the business logic interface
@@ -90,4 +119,6 @@ type ReportCardUsecase interface {
 	ListSubmissions(ctx context.Context, grade string, page int, limit int) (*PaginatedReportCards, error)
 	GetOLCertificate(ctx context.Context, applicationID string) (*DocumentVersion, error)
 	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
+	ListByMonth(ctx context.Context, year int, month int, grade string, page int, limit int) (*PaginatedMonthReportCards, error)
+	PayMonth(ctx context.Context, id string, year int, month int, userID string) (*ReportCardMonth, error)
 }

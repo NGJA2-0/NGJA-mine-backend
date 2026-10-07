@@ -12,11 +12,12 @@ import (
 )
 
 type reportCardUsecase struct {
-	repo domain.ReportCardRepository
+	repo     domain.ReportCardRepository
+	userRepo domain.UserRepository
 }
 
-func NewReportCardUsecase(repo domain.ReportCardRepository) domain.ReportCardUsecase {
-	return &reportCardUsecase{repo: repo}
+func NewReportCardUsecase(repo domain.ReportCardRepository, userRepo domain.UserRepository) domain.ReportCardUsecase {
+	return &reportCardUsecase{repo: repo, userRepo: userRepo}
 }
 
 // buildMonths returns one entry per calendar month from the start month to the end month, inclusive.
@@ -161,4 +162,84 @@ func (u *reportCardUsecase) GetOLCertificate(ctx context.Context, id string) (*d
 
 func (u *reportCardUsecase) AddOLCertificate(ctx context.Context, id string, v domain.DocumentVersion) error {
 	return u.repo.AddOLCertificate(ctx, id, v)
+}
+
+func validatePeriod(year int, month int) error {
+	if year < 2000 || year > 2100 || month < 1 || month > 12 {
+		return domain.ErrInvalidPeriod
+	}
+	return nil
+}
+
+func (u *reportCardUsecase) ListByMonth(ctx context.Context, year int, month int, grade string, page int, limit int) (*domain.PaginatedMonthReportCards, error) {
+	if err := validatePeriod(year, month); err != nil {
+		return nil, err
+	}
+
+	switch limit {
+	case 10, 15, 20:
+		// valid
+	default:
+		limit = 10
+	}
+	if page < 1 {
+		page = 1
+	}
+
+	cards, total, err := u.repo.ListByMonth(ctx, year, month, strings.TrimSpace(grade), page, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	rows := make([]*domain.ReportCardMonthRow, 0, len(cards))
+	for _, card := range cards {
+		row := &domain.ReportCardMonthRow{ReportCard: *card}
+		for i := range card.Months {
+			if card.Months[i].Year == year && card.Months[i].Month == month {
+				m := card.Months[i]
+				row.SelectedMonth = &m
+				break
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	totalPages := int((total + int64(limit) - 1) / int64(limit))
+	return &domain.PaginatedMonthReportCards{
+		Data:       rows,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: totalPages,
+	}, nil
+}
+
+func (u *reportCardUsecase) PayMonth(ctx context.Context, id string, year int, month int, userID string) (*domain.ReportCardMonth, error) {
+	if err := validatePeriod(year, month); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(id) == "" {
+		return nil, domain.ErrInvalidReportCardID
+	}
+
+	// The token only carries user_id, so look up the name
+	user, err := u.userRepo.GetUserByID(ctx, userID)
+	if err != nil || user == nil {
+		return nil, domain.ErrUserNotFound
+	}
+
+	paidAt := time.Now().UTC()
+	if err := u.repo.MarkMonthPaid(ctx, id, year, month, user.Name, userID, paidAt); err != nil {
+		return nil, err
+	}
+
+	return &domain.ReportCardMonth{
+		Year:     year,
+		Month:    month,
+		Label:    fmt.Sprintf("%d-%s", year, time.Month(month).String()),
+		Paid:     true,
+		PaidAt:   &paidAt,
+		PaidBy:   user.Name,
+		PaidByID: userID,
+	}, nil
 }

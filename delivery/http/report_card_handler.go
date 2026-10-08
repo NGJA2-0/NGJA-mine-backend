@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -27,6 +28,10 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 
 	api := app.Group("/api/report-cards", middleware.Protected(jwtSecret))
 	api.Get("/search", handler.Search)
+	api.Get("/by-month", handler.ListByMonth)
+	api.Get("/monthly-report", handler.GetMonthlyReport)
+	api.Get("/monthly-report/all", handler.GetMonthlyReportAll)
+	api.Patch("/:id/pay", handler.PayMonths)
 	api.Get("/by-application/:applicationId", handler.GetByApplicationID)
 	api.Get("/", handler.ListSubmissions)
 	api.Post("/", handler.Create)
@@ -237,4 +242,136 @@ func (h *ReportCardHandler) GetOLCertificateFile(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/pdf")
 	c.Set("Content-Disposition", "inline")
 	return c.SendFile(doc.StoredPath)
+}
+
+func (h *ReportCardHandler) ListByMonth(c *fiber.Ctx) error {
+	year, err := strconv.Atoi(c.Query("year"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "year is required and must be a number"})
+	}
+
+	fromStr, toStr := c.Query("fromMonth"), c.Query("toMonth")
+	if fromStr == "" && toStr == "" {
+		// single-month shortcut: ?month=6 is the same as fromMonth=6&toMonth=6
+		fromStr = c.Query("month")
+		toStr = fromStr
+	}
+	fromMonth, err := strconv.Atoi(fromStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "fromMonth is required and must be a number (1-12)"})
+	}
+	toMonth, err := strconv.Atoi(toStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "toMonth is required and must be a number (1-12)"})
+	}
+
+	grade := strings.TrimSpace(c.Query("grade")) // optional, matched against current_grade
+
+	page, err := strconv.Atoi(c.Query("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(c.Query("limit", "10"))
+	if err != nil {
+		limit = 10
+	}
+
+	result, err := h.Usecase.ListByMonth(c.Context(), year, fromMonth, toMonth, grade, page, limit)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPeriod) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(result)
+}
+
+func (h *ReportCardHandler) PayMonths(c *fiber.Ctx) error {
+	var body struct {
+		Year      int `json:"year"`
+		FromMonth int `json:"fromMonth"`
+		ToMonth   int `json:"toMonth"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+
+	// Set by middleware.Protected from the JWT
+	userID, _ := c.Locals("user_id").(string)
+
+	result, err := h.Usecase.PayMonths(c.Context(), c.Params("id"), body.Year, body.FromMonth, body.ToMonth, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInvalidReportCardID), errors.Is(err, domain.ErrInvalidPeriod):
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		case errors.Is(err, domain.ErrMonthNotFound):
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		case errors.Is(err, domain.ErrMonthAlreadyPaid):
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+		case errors.Is(err, domain.ErrUserNotFound):
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Months marked as paid",
+		"result":  result,
+	})
+}
+
+func parseYearMonth(c *fiber.Ctx) (int, int, error) {
+	year, err := strconv.Atoi(c.Query("year"))
+	if err != nil {
+		return 0, 0, errors.New("year is required and must be a number")
+	}
+	month, err := strconv.Atoi(c.Query("month"))
+	if err != nil {
+		return 0, 0, errors.New("month is required and must be a number (1-12)")
+	}
+	return year, month, nil
+}
+
+// GetMonthlyReport: paginated list + full totals for one year and month
+func (h *ReportCardHandler) GetMonthlyReport(c *fiber.Ctx) error {
+	year, month, err := parseYearMonth(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	page, err := strconv.Atoi(c.Query("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(c.Query("limit", "10"))
+	if err != nil {
+		limit = 10
+	}
+
+	result, err := h.Usecase.GetMonthlyReport(c.Context(), year, month, page, limit)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPeriod) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(result)
+}
+
+// GetMonthlyReportAll: every row + full totals, for the report download button
+func (h *ReportCardHandler) GetMonthlyReportAll(c *fiber.Ctx) error {
+	year, month, err := parseYearMonth(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	result, err := h.Usecase.GetMonthlyReportAll(c.Context(), year, month)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPeriod) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(result)
 }

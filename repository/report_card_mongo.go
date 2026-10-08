@@ -196,6 +196,42 @@ func (r *reportCardMongoRepo) ListSubmissions(ctx context.Context, grade string,
 	}, nil
 }
 
+// ListByMonth returns report cards that have at least one month inside the given year and month range,
+// optionally filtered by current grade.
+func (r *reportCardMongoRepo) ListByMonth(ctx context.Context, year int, fromMonth int, toMonth int, grade string, page int, limit int) ([]*domain.ReportCard, int64, error) {
+	filter := bson.M{
+		"months": bson.M{"$elemMatch": bson.M{
+			"year":  year,
+			"month": bson.M{"$gte": fromMonth, "$lte": toMonth},
+		}},
+	}
+	if strings.TrimSpace(grade) != "" {
+		filter["current_grade"] = grade
+	}
+
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	opts := options.Find().
+		SetSort(bson.M{"createdAt": -1}).
+		SetSkip(int64((page - 1) * limit)).
+		SetLimit(int64(limit))
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var cards []*domain.ReportCard
+	if err = cursor.All(ctx, &cards); err != nil {
+		return nil, 0, err
+	}
+	return cards, total, nil
+}
+
 func (r *reportCardMongoRepo) GetOLCertificate(ctx context.Context, applicationID string) (*domain.DocumentVersion, error) {
 	oid, err := primitive.ObjectIDFromHex(applicationID)
 	if err != nil {
@@ -265,4 +301,162 @@ func (r *reportCardMongoRepo) AddOLCertificate(ctx context.Context, applicationI
 		return errors.New("application not found or O/L certificate already exists")
 	}
 	return nil
+}
+
+// MarkMonthsPaid sets paid=true on every UNPAID month of ONE report card that falls inside the
+// given year and month range. Months outside the range, and months already paid, are untouched.
+// It is a single atomic update, so a card can never end up half-paid.
+// It returns the months that were switched to paid and how many in-range months were already paid.
+func (r *reportCardMongoRepo) MarkMonthsPaid(ctx context.Context, id string, year int, fromMonth int, toMonth int, paidBy string, paidByID string, paidAt time.Time) ([]domain.ReportCardMonth, int, error) {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, 0, domain.ErrInvalidReportCardID
+	}
+
+	monthRange := bson.M{"$gte": fromMonth, "$lte": toMonth}
+
+	// Only matches while at least one month in the range is still unpaid
+	filter := bson.M{
+		"_id": oid,
+		"months": bson.M{"$elemMatch": bson.M{
+			"year": year, "month": monthRange, "paid": false,
+		}},
+	}
+	update := bson.M{"$set": bson.M{
+		"months.$[m].paid":     true,
+		"months.$[m].paidAt":   paidAt,
+		"months.$[m].paidBy":   paidBy,
+		"months.$[m].paidById": paidByID,
+	}}
+	opts := options.FindOneAndUpdate().
+		SetArrayFilters(options.ArrayFilters{Filters: []interface{}{
+			bson.M{"m.year": year, "m.month": monthRange, "m.paid": false},
+		}}).
+		SetReturnDocument(options.Before).
+		SetProjection(bson.M{"months": 1})
+
+	var before struct {
+		Months []domain.ReportCardMonth `bson:"months"`
+	}
+	err = r.collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&before)
+	if err == mongo.ErrNoDocuments {
+		// Nothing was updated: either no months in range exist, or they are all already paid.
+		exists, cerr := r.collection.CountDocuments(ctx, bson.M{
+			"_id":    oid,
+			"months": bson.M{"$elemMatch": bson.M{"year": year, "month": monthRange}},
+		})
+		if cerr != nil {
+			return nil, 0, cerr
+		}
+		if exists > 0 {
+			return nil, 0, domain.ErrMonthAlreadyPaid
+		}
+		return nil, 0, domain.ErrMonthNotFound
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// "before" is the document as it was just before the atomic update, so the unpaid months in
+	// range are exactly the ones this call switched to paid.
+	at := paidAt
+	paid := []domain.ReportCardMonth{}
+	alreadyPaid := 0
+	for _, m := range before.Months {
+		if m.Year != year || m.Month < fromMonth || m.Month > toMonth {
+			continue
+		}
+		if m.Paid {
+			alreadyPaid++
+			continue
+		}
+		m.Paid = true
+		m.PaidAt = &at
+		m.PaidBy = paidBy
+		m.PaidByID = paidByID
+		paid = append(paid, m)
+	}
+	return paid, alreadyPaid, nil
+}
+
+// GetMonthlyReport returns the report cards that contain the given year+month, each WITHOUT the months
+// array but with only the selected month, plus totals over ALL matching cards.
+// limit = 0 means "no pagination" (return everything).
+func (r *reportCardMongoRepo) GetMonthlyReport(ctx context.Context, year int, month int, skip int64, limit int64) ([]*domain.MonthlyReportRow, *domain.MonthlyReportSummary, error) {
+	match := bson.D{{Key: "$match", Value: bson.M{
+		"months": bson.M{"$elemMatch": bson.M{"year": year, "month": month}},
+	}}}
+
+	// Picks the entry of the months array for this year+month
+	selectedMonth := bson.M{"$arrayElemAt": bson.A{
+		bson.M{"$filter": bson.M{
+			"input": "$months",
+			"as":    "m",
+			"cond": bson.M{"$and": bson.A{
+				bson.M{"$eq": bson.A{"$$m.year", year}},
+				bson.M{"$eq": bson.A{"$$m.month", month}},
+			}},
+		}},
+		0,
+	}}
+	isPaid := bson.M{"$eq": bson.A{"$selected.paid", true}}
+	aggOpts := options.Aggregate().SetAllowDiskUse(true)
+
+	// 1) Totals over ALL matching cards, never affected by pagination
+	summaryPipeline := mongo.Pipeline{
+		match,
+		bson.D{{Key: "$addFields", Value: bson.M{"selected": selectedMonth}}},
+		bson.D{{Key: "$group", Value: bson.M{
+			"_id":          nil,
+			"totalCount":   bson.M{"$sum": 1},
+			"totalAmount":  bson.M{"$sum": "$amount"},
+			"paidCount":    bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, 1, 0}}},
+			"paidAmount":   bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, "$amount", 0}}},
+			"unpaidCount":  bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, 0, 1}}},
+			"unpaidAmount": bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, 0, "$amount"}}},
+		}}},
+	}
+
+	summaryCursor, err := r.collection.Aggregate(ctx, summaryPipeline, aggOpts)
+	if err != nil {
+		return nil, nil, err
+	}
+	var summaries []domain.MonthlyReportSummary
+	if err = summaryCursor.All(ctx, &summaries); err != nil {
+		return nil, nil, err
+	}
+	summary := &domain.MonthlyReportSummary{} // stays all zeros when nothing matches
+	if len(summaries) > 0 {
+		summary = &summaries[0]
+	}
+
+	// 2) The rows (one page, or everything when limit = 0)
+	rowsPipeline := mongo.Pipeline{
+		match,
+		bson.D{{Key: "$sort", Value: bson.D{{Key: "createdAt", Value: -1}, {Key: "_id", Value: -1}}}},
+	}
+	if skip > 0 {
+		rowsPipeline = append(rowsPipeline, bson.D{{Key: "$skip", Value: skip}})
+	}
+	if limit > 0 {
+		rowsPipeline = append(rowsPipeline, bson.D{{Key: "$limit", Value: limit}})
+	}
+	rowsPipeline = append(rowsPipeline,
+		bson.D{{Key: "$addFields", Value: bson.M{"month": selectedMonth}}},
+		bson.D{{Key: "$project", Value: bson.M{"months": 0}}}, // drop the months array
+	)
+
+	rowsCursor, err := r.collection.Aggregate(ctx, rowsPipeline, aggOpts)
+	if err != nil {
+		return nil, nil, err
+	}
+	var rows []*domain.MonthlyReportRow
+	if err = rowsCursor.All(ctx, &rows); err != nil {
+		return nil, nil, err
+	}
+	if rows == nil {
+		rows = []*domain.MonthlyReportRow{}
+	}
+
+	return rows, summary, nil
 }

@@ -45,7 +45,7 @@ func main() {
 	miningLicenseUsecase := usecase.NewMiningLicenseUsecase(miningLicenseRepo)
 	extendMiningLicenseUsecase := usecase.NewExtendMiningLicenseUsecase(extendMiningLicenseRepo)
 	miniSahanaUsecase := usecase.NewMiniSahanaUsecase(miniSahanaRepo, userRepo)
-	reportCardUsecase := usecase.NewReportCardUsecase(reportCardRepo)
+	reportCardUsecase := usecase.NewReportCardUsecase(reportCardRepo, userRepo)
 
 	// Setup Handlers (Routes)
 	httpHandler.NewUserHandler(app, userUsecase)

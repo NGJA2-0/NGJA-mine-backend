@@ -41,6 +41,13 @@ func (u *miningLicenseUsecase) Submit(ctx context.Context, license *domain.Mecha
 	if license.GMLNumber == "" {
 		return nil, errors.New("gmlNumber is required")
 	}
+	exists, err := u.repo.ExistsByGMLNumber(ctx, strings.TrimSpace(license.GMLNumber))
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify GML number: %w", err)
+	}
+	if exists {
+		return nil, errors.New("a mining license with this GML number already exists")
+	}
 	if len(license.GPSPoints) == 0 {
 		return nil, errors.New("at least one gpsPoint is required")
 	}
@@ -85,13 +92,13 @@ func (u *miningLicenseUsecase) Submit(ctx context.Context, license *domain.Mecha
 		}
 	}
 
-	// ── Conditional: Ratnapura land attachments ───────────────────────────────
+	// ── Conditional: Ratnapura land evidence ──────────────────────────────────
 	if license.IsRatnapuraLand == "yes" {
-		if license.WrittenEvidenceAttachmentUrl == "" {
-			return nil, errors.New("writtenEvidenceAttachmentUrl is required for Ratnapura land")
+		if license.WrittenEvidenceSubmitted != "yes" && license.WrittenEvidenceSubmitted != "no" {
+			return nil, errors.New("writtenEvidenceSubmitted is required for Ratnapura land (yes/no)")
 		}
-		if license.AffidavitAttachmentUrl == "" {
-			return nil, errors.New("affidavitAttachmentUrl is required for Ratnapura land")
+		if license.AffidavitSubmitted != "yes" && license.AffidavitSubmitted != "no" {
+			return nil, errors.New("affidavitSubmitted is required for Ratnapura land (yes/no)")
 		}
 	}
 
@@ -696,4 +703,13 @@ func gpsBounds(lats []float64, lngs []float64) *domain.MapBounds {
 		}
 	}
 	return b
+}
+
+// ExistsByGMLNumber reports whether a GML number is already used by any license.
+func (u *miningLicenseUsecase) ExistsByGMLNumber(ctx context.Context, gmlNumber string) (bool, error) {
+	gmlNumber = strings.TrimSpace(gmlNumber)
+	if gmlNumber == "" {
+		return false, nil
+	}
+	return u.repo.ExistsByGMLNumber(ctx, gmlNumber)
 }

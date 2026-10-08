@@ -100,13 +100,13 @@ func (u *extendMiningLicenseUsecase) Submit(ctx context.Context, license *domain
 		}
 	}
 
-	// ── Conditional: Ratnapura land attachments ───────────────────────────────
+	// ── Conditional: Ratnapura land evidence ──────────────────────────────────
 	if license.IsRatnapuraLand == "yes" {
-		if license.WrittenEvidenceAttachmentUrl == "" {
-			return nil, errors.New("writtenEvidenceAttachmentUrl is required for Ratnapura land")
+		if license.WrittenEvidenceSubmitted != "yes" && license.WrittenEvidenceSubmitted != "no" {
+			return nil, errors.New("writtenEvidenceSubmitted is required for Ratnapura land (yes/no)")
 		}
-		if license.AffidavitAttachmentUrl == "" {
-			return nil, errors.New("affidavitAttachmentUrl is required for Ratnapura land")
+		if license.AffidavitSubmitted != "yes" && license.AffidavitSubmitted != "no" {
+			return nil, errors.New("affidavitSubmitted is required for Ratnapura land (yes/no)")
 		}
 	}
 

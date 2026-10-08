@@ -56,6 +56,10 @@ type MechanizedGemMiningLicense struct {
 
 	// Ratnapura land evidence
 	IsRatnapuraLand             string `json:"isRatnapuraLand" bson:"isRatnapuraLand"` // "yes" | "no"
+	
+	WrittenEvidenceSubmitted    string `json:"writtenEvidenceSubmitted,omitempty" bson:"writtenEvidenceSubmitted,omitempty"` // "yes" | "no"
+	AffidavitSubmitted          string `json:"affidavitSubmitted,omitempty" bson:"affidavitSubmitted,omitempty"`             // "yes" | "no"
+
 	WrittenEvidenceAttachmentUrl string `json:"writtenEvidenceAttachmentUrl,omitempty" bson:"writtenEvidenceAttachmentUrl,omitempty"`
 	AffidavitAttachmentUrl       string `json:"affidavitAttachmentUrl,omitempty" bson:"affidavitAttachmentUrl,omitempty"`
 
@@ -276,6 +280,9 @@ type MiningLicenseRepository interface {
 	// returns the whole document instead of the slim map projection. Used
 	// by the district / regionalOffice / filter dropdown endpoints.
 	GetAllLatestFull(ctx context.Context) ([]MechanizedGemMiningLicense, error)
+	// ExistsByGMLNumber reports whether any document already uses this GML number.
+	ExistsByGMLNumber(ctx context.Context, gmlNumber string) (bool, error)
+
 }
 
 // MiningLicenseUsecase defines business logic for mining license applications
@@ -313,6 +320,7 @@ type MiningLicenseUsecase interface {
 	// GetMineMapMarkers returns every individual mine pin for the given
 	// district + regionalOffice — used when a user clicks/zooms into an office pin.
 	GetMineMapMarkers(ctx context.Context, district string, regionalOffice string) ([]MapMineMarker, error)
+	ExistsByGMLNumber(ctx context.Context, gmlNumber string) (bool, error)
 }
 
 // LatestMiningLicenseInfo represents the required fields for the latest license.

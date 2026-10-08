@@ -509,3 +509,15 @@ func (r *miningLicenseMongoRepo) GetAllLatest(ctx context.Context) ([]domain.Lat
 	}
 	return results, nil
 }
+
+func (r *miningLicenseMongoRepo) ExistsByGMLNumber(ctx context.Context, gmlNumber string) (bool, error) {
+	count, err := r.collection.CountDocuments(
+		ctx,
+		bson.M{"gmlNumber": gmlNumber},
+		options.Count().SetLimit(1),
+	)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

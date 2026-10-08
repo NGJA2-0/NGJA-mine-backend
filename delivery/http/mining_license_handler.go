@@ -34,6 +34,7 @@ func NewMiningLicenseHandler(app *fiber.App, uc domain.MiningLicenseUsecase, use
 	api.Get("/map/districts", auth, handler.GetMapDistrictClusters)
 	api.Get("/map/regional-offices", auth, handler.GetMapRegionalOfficeClusters)
 	api.Get("/map/mines", auth, handler.GetMapMineMarkers)
+	api.Get("/gml-exists", auth, handler.CheckGMLExists)
 	api.Get("/:id", auth, handler.GetByID)
 	api.Get("/:id/compare", auth, handler.CompareWithPrevious)
 	api.Post("/:id/edit", auth, handler.Edit)
@@ -489,4 +490,21 @@ func (h *MiningLicenseHandler) GetMapMineMarkers(c *fiber.Ctx) error {
 		"message": "Mine markers retrieved successfully",
 		"data":    markers,
 	})
+}
+
+// CheckGMLExists godoc
+// GET /api/mining-licenses/gml-exists?gml=XXXX
+func (h *MiningLicenseHandler) CheckGMLExists(c *fiber.Ctx) error {
+	gml := c.Query("gml")
+	if gml == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "gml query param is required",
+		})
+	}
+
+	exists, err := h.Usecase.ExistsByGMLNumber(c.Context(), gml)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"exists": exists})
 }

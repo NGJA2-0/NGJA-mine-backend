@@ -38,6 +38,10 @@ type ExtendMiningLicense struct {
 
 	// Ratnapura land evidence
 	IsRatnapuraLand             string `json:"isRatnapuraLand" bson:"isRatnapuraLand"` // "yes" | "no"
+	
+	WrittenEvidenceSubmitted    string `json:"writtenEvidenceSubmitted,omitempty" bson:"writtenEvidenceSubmitted,omitempty"` // "yes" | "no"
+	AffidavitSubmitted          string `json:"affidavitSubmitted,omitempty" bson:"affidavitSubmitted,omitempty"`             // "yes" | "no"
+
 	WrittenEvidenceAttachmentUrl string `json:"writtenEvidenceAttachmentUrl,omitempty" bson:"writtenEvidenceAttachmentUrl,omitempty"`
 	AffidavitAttachmentUrl       string `json:"affidavitAttachmentUrl,omitempty" bson:"affidavitAttachmentUrl,omitempty"`
 

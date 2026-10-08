@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -254,4 +255,62 @@ func (u *reportCardUsecase) PayMonths(ctx context.Context, id string, year int, 
 		PaidAt:           paidAt,
 		PaidBy:           user.Name,
 	}, nil
+}
+
+func buildMonthlyReport(year int, month int, rows []*domain.MonthlyReportRow, s *domain.MonthlyReportSummary) domain.MonthlyReport {
+	round2 := func(v float64) float64 { return math.Round(v*100) / 100 }
+	s.TotalAmount = round2(s.TotalAmount)
+	s.PaidAmount = round2(s.PaidAmount)
+	s.UnpaidAmount = round2(s.UnpaidAmount)
+
+	return domain.MonthlyReport{
+		Year:       year,
+		Month:      month,
+		MonthLabel: fmt.Sprintf("%d-%s", year, time.Month(month).String()),
+		Summary:    *s,
+		Data:       rows,
+	}
+}
+
+func (u *reportCardUsecase) GetMonthlyReport(ctx context.Context, year int, month int, page int, limit int) (*domain.PaginatedMonthlyReport, error) {
+	if err := validatePeriod(year, month, month); err != nil {
+		return nil, err
+	}
+
+	switch limit {
+	case 10, 15, 20:
+		// valid
+	default:
+		limit = 10
+	}
+	if page < 1 {
+		page = 1
+	}
+
+	rows, summary, err := u.repo.GetMonthlyReport(ctx, year, month, int64((page-1)*limit), int64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	totalPages := int((summary.TotalCount + int64(limit) - 1) / int64(limit))
+	return &domain.PaginatedMonthlyReport{
+		MonthlyReport: buildMonthlyReport(year, month, rows, summary),
+		Page:          page,
+		Limit:         limit,
+		TotalPages:    totalPages,
+	}, nil
+}
+
+func (u *reportCardUsecase) GetMonthlyReportAll(ctx context.Context, year int, month int) (*domain.MonthlyReport, error) {
+	if err := validatePeriod(year, month, month); err != nil {
+		return nil, err
+	}
+
+	rows, summary, err := u.repo.GetMonthlyReport(ctx, year, month, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	report := buildMonthlyReport(year, month, rows, summary)
+	return &report, nil
 }

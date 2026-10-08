@@ -378,3 +378,85 @@ func (r *reportCardMongoRepo) MarkMonthsPaid(ctx context.Context, id string, yea
 	}
 	return paid, alreadyPaid, nil
 }
+
+// GetMonthlyReport returns the report cards that contain the given year+month, each WITHOUT the months
+// array but with only the selected month, plus totals over ALL matching cards.
+// limit = 0 means "no pagination" (return everything).
+func (r *reportCardMongoRepo) GetMonthlyReport(ctx context.Context, year int, month int, skip int64, limit int64) ([]*domain.MonthlyReportRow, *domain.MonthlyReportSummary, error) {
+	match := bson.D{{Key: "$match", Value: bson.M{
+		"months": bson.M{"$elemMatch": bson.M{"year": year, "month": month}},
+	}}}
+
+	// Picks the entry of the months array for this year+month
+	selectedMonth := bson.M{"$arrayElemAt": bson.A{
+		bson.M{"$filter": bson.M{
+			"input": "$months",
+			"as":    "m",
+			"cond": bson.M{"$and": bson.A{
+				bson.M{"$eq": bson.A{"$$m.year", year}},
+				bson.M{"$eq": bson.A{"$$m.month", month}},
+			}},
+		}},
+		0,
+	}}
+	isPaid := bson.M{"$eq": bson.A{"$selected.paid", true}}
+	aggOpts := options.Aggregate().SetAllowDiskUse(true)
+
+	// 1) Totals over ALL matching cards, never affected by pagination
+	summaryPipeline := mongo.Pipeline{
+		match,
+		bson.D{{Key: "$addFields", Value: bson.M{"selected": selectedMonth}}},
+		bson.D{{Key: "$group", Value: bson.M{
+			"_id":          nil,
+			"totalCount":   bson.M{"$sum": 1},
+			"totalAmount":  bson.M{"$sum": "$amount"},
+			"paidCount":    bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, 1, 0}}},
+			"paidAmount":   bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, "$amount", 0}}},
+			"unpaidCount":  bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, 0, 1}}},
+			"unpaidAmount": bson.M{"$sum": bson.M{"$cond": bson.A{isPaid, 0, "$amount"}}},
+		}}},
+	}
+
+	summaryCursor, err := r.collection.Aggregate(ctx, summaryPipeline, aggOpts)
+	if err != nil {
+		return nil, nil, err
+	}
+	var summaries []domain.MonthlyReportSummary
+	if err = summaryCursor.All(ctx, &summaries); err != nil {
+		return nil, nil, err
+	}
+	summary := &domain.MonthlyReportSummary{} // stays all zeros when nothing matches
+	if len(summaries) > 0 {
+		summary = &summaries[0]
+	}
+
+	// 2) The rows (one page, or everything when limit = 0)
+	rowsPipeline := mongo.Pipeline{
+		match,
+		bson.D{{Key: "$sort", Value: bson.D{{Key: "createdAt", Value: -1}, {Key: "_id", Value: -1}}}},
+	}
+	if skip > 0 {
+		rowsPipeline = append(rowsPipeline, bson.D{{Key: "$skip", Value: skip}})
+	}
+	if limit > 0 {
+		rowsPipeline = append(rowsPipeline, bson.D{{Key: "$limit", Value: limit}})
+	}
+	rowsPipeline = append(rowsPipeline,
+		bson.D{{Key: "$addFields", Value: bson.M{"month": selectedMonth}}},
+		bson.D{{Key: "$project", Value: bson.M{"months": 0}}}, // drop the months array
+	)
+
+	rowsCursor, err := r.collection.Aggregate(ctx, rowsPipeline, aggOpts)
+	if err != nil {
+		return nil, nil, err
+	}
+	var rows []*domain.MonthlyReportRow
+	if err = rowsCursor.All(ctx, &rows); err != nil {
+		return nil, nil, err
+	}
+	if rows == nil {
+		rows = []*domain.MonthlyReportRow{}
+	}
+
+	return rows, summary, nil
+}

@@ -92,6 +92,40 @@ type PayMonthsResult struct {
 	PaidBy           string            `json:"paidBy"`
 }
 
+// MonthlyReportRow is a report card without its months array, plus only the selected month
+type MonthlyReportRow struct {
+	ReportCard `bson:",inline"`
+	Month      *ReportCardMonth `json:"month" bson:"month"`
+}
+
+// MonthlyReportSummary holds the totals for ALL matching cards of the month (not just one page).
+// Amounts use each card's monthly "amount" field.
+type MonthlyReportSummary struct {
+	TotalCount   int64   `json:"totalCount" bson:"totalCount"`
+	PaidCount    int64   `json:"paidCount" bson:"paidCount"`
+	UnpaidCount  int64   `json:"unpaidCount" bson:"unpaidCount"`
+	TotalAmount  float64 `json:"totalAmount" bson:"totalAmount"`
+	PaidAmount   float64 `json:"paidAmount" bson:"paidAmount"`
+	UnpaidAmount float64 `json:"unpaidAmount" bson:"unpaidAmount"`
+}
+
+// MonthlyReport is the report for one year + month
+type MonthlyReport struct {
+	Year       int                  `json:"year"`
+	Month      int                  `json:"month"`
+	MonthLabel string               `json:"monthLabel"`
+	Summary    MonthlyReportSummary `json:"summary"`
+	Data       []*MonthlyReportRow  `json:"data"`
+}
+
+// PaginatedMonthlyReport is the paginated version of the report
+type PaginatedMonthlyReport struct {
+	MonthlyReport
+	Page       int `json:"page"`
+	Limit      int `json:"limit"`
+	TotalPages int `json:"totalPages"`
+}
+
 // PaginatedMonthReportCards is the response of the year/month search
 type PaginatedMonthReportCards struct {
 	Data       []*ReportCardMonthRow `json:"data"`
@@ -123,6 +157,7 @@ type ReportCardRepository interface {
 	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
 	ListByMonth(ctx context.Context, year int, fromMonth int, toMonth int, grade string, page int, limit int) ([]*ReportCard, int64, error)
 	MarkMonthsPaid(ctx context.Context, id string, year int, fromMonth int, toMonth int, paidBy string, paidByID string, paidAt time.Time) ([]ReportCardMonth, int, error)
+	GetMonthlyReport(ctx context.Context, year int, month int, skip int64, limit int64) ([]*MonthlyReportRow, *MonthlyReportSummary, error)
 }
 
 // ReportCardUsecase defines the business logic interface
@@ -135,4 +170,6 @@ type ReportCardUsecase interface {
 	AddOLCertificate(ctx context.Context, applicationID string, v DocumentVersion) error
 	ListByMonth(ctx context.Context, year int, fromMonth int, toMonth int, grade string, page int, limit int) (*PaginatedMonthReportCards, error)
 	PayMonths(ctx context.Context, id string, year int, fromMonth int, toMonth int, userID string) (*PayMonthsResult, error)
+	GetMonthlyReport(ctx context.Context, year int, month int, page int, limit int) (*PaginatedMonthlyReport, error)
+	GetMonthlyReportAll(ctx context.Context, year int, month int) (*MonthlyReport, error)
 }

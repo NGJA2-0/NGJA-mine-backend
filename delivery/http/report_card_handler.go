@@ -29,6 +29,8 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 	api := app.Group("/api/report-cards", middleware.Protected(jwtSecret))
 	api.Get("/search", handler.Search)
 	api.Get("/by-month", handler.ListByMonth)
+	api.Get("/monthly-report", handler.GetMonthlyReport)
+	api.Get("/monthly-report/all", handler.GetMonthlyReportAll)
 	api.Patch("/:id/pay", handler.PayMonths)
 	api.Get("/by-application/:applicationId", handler.GetByApplicationID)
 	api.Get("/", handler.ListSubmissions)
@@ -317,4 +319,59 @@ func (h *ReportCardHandler) PayMonths(c *fiber.Ctx) error {
 		"message": "Months marked as paid",
 		"result":  result,
 	})
+}
+
+func parseYearMonth(c *fiber.Ctx) (int, int, error) {
+	year, err := strconv.Atoi(c.Query("year"))
+	if err != nil {
+		return 0, 0, errors.New("year is required and must be a number")
+	}
+	month, err := strconv.Atoi(c.Query("month"))
+	if err != nil {
+		return 0, 0, errors.New("month is required and must be a number (1-12)")
+	}
+	return year, month, nil
+}
+
+// GetMonthlyReport: paginated list + full totals for one year and month
+func (h *ReportCardHandler) GetMonthlyReport(c *fiber.Ctx) error {
+	year, month, err := parseYearMonth(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	page, err := strconv.Atoi(c.Query("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limit, err := strconv.Atoi(c.Query("limit", "10"))
+	if err != nil {
+		limit = 10
+	}
+
+	result, err := h.Usecase.GetMonthlyReport(c.Context(), year, month, page, limit)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPeriod) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(result)
+}
+
+// GetMonthlyReportAll: every row + full totals, for the report download button
+func (h *ReportCardHandler) GetMonthlyReportAll(c *fiber.Ctx) error {
+	year, month, err := parseYearMonth(c)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	result, err := h.Usecase.GetMonthlyReportAll(c.Context(), year, month)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPeriod) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(fiber.StatusOK).JSON(result)
 }

@@ -37,6 +37,7 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 	api.Post("/", handler.Create)
 	api.Get("/ol-certificate/:applicationId", handler.GetOLCertificateStatus)
 	api.Get("/ol-certificate/:applicationId/file", handler.GetOLCertificateFile)
+	api.Get("/grade-limit/:applicationId", handler.GetGradeLimit)
 }
 
 func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
@@ -83,6 +84,25 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":  "Validation failed",
 			"fields": errorsList,
+		})
+	}
+
+	// Grade must not be lower than the application grade / previously submitted grades
+	limit, err := h.Usecase.GetGradeLimit(c.Context(), card.ApplicationID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	card.AppliedGrade = limit.AppliedGrade // take it from the application, not the client
+
+	grade, _ := strconv.Atoi(card.CurrentGrade)
+	if grade < limit.MinGrade {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("current grade cannot be lower than %d", limit.MinGrade),
+		})
+	}
+	if grade > 13 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "current grade cannot be higher than 13",
 		})
 	}
 
@@ -374,4 +394,12 @@ func (h *ReportCardHandler) GetMonthlyReportAll(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.Status(fiber.StatusOK).JSON(result)
+}
+
+func (h *ReportCardHandler) GetGradeLimit(c *fiber.Ctx) error {
+	limit, err := h.Usecase.GetGradeLimit(c.Context(), c.Params("applicationId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(limit)
 }

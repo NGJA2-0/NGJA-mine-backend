@@ -314,3 +314,10 @@ func (u *reportCardUsecase) GetMonthlyReportAll(ctx context.Context, year int, m
 	report := buildMonthlyReport(year, month, rows, summary)
 	return &report, nil
 }
+
+func (u *reportCardUsecase) GetGradeLimit(ctx context.Context, id string) (*domain.GradeLimit, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, errors.New("applicationId is required")
+	}
+	return u.repo.GetGradeLimit(ctx, id)
+}

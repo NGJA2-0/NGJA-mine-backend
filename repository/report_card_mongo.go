@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 	"errors"
+	"strconv"
 
 	"my-fiber-app/domain"
 
@@ -459,4 +460,61 @@ func (r *reportCardMongoRepo) GetMonthlyReport(ctx context.Context, year int, mo
 	}
 
 	return rows, summary, nil
+}
+
+// Reads the leading digits, so both "12" and "12 වසර" parse to 12.
+func parseGrade(s string) int {
+	digits := ""
+	for _, r := range strings.TrimSpace(s) {
+		if r < '0' || r > '9' {
+			break
+		}
+		digits += string(r)
+	}
+	n, _ := strconv.Atoi(digits)
+	return n
+}
+
+func (r *reportCardMongoRepo) GetGradeLimit(ctx context.Context, applicationID string) (*domain.GradeLimit, error) {
+	oid, err := primitive.ObjectIDFromHex(applicationID)
+	if err != nil {
+		return nil, errors.New("invalid applicationId")
+	}
+
+	// 1. The grade the student applied with
+	var app struct {
+		Grade string `bson:"grade"`
+	}
+	err = r.db.Collection("applications").
+		FindOne(ctx, bson.M{"_id": oid}, options.FindOne().SetProjection(bson.M{"grade": 1})).
+		Decode(&app)
+	if err == mongo.ErrNoDocuments {
+		return nil, errors.New("application not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	minGrade := parseGrade(app.Grade)
+
+	// 2. The highest grade among previously submitted report cards
+	cursor, err := r.collection.Find(ctx, bson.M{"applicationId": applicationID},
+		options.Find().SetProjection(bson.M{"current_grade": 1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var cards []struct {
+		CurrentGrade string `bson:"current_grade"`
+	}
+	if err := cursor.All(ctx, &cards); err != nil {
+		return nil, err
+	}
+	for _, c := range cards {
+		if g := parseGrade(c.CurrentGrade); g > minGrade {
+			minGrade = g
+		}
+	}
+
+	return &domain.GradeLimit{AppliedGrade: app.Grade, MinGrade: minGrade}, nil
 }

@@ -36,6 +36,14 @@ type ReportCard struct {
 	CreatedAt     time.Time          `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
 }
 
+const MaxReportCardsPerYear = 2
+
+type GradeLimit struct {
+	AppliedGrade  string `json:"appliedGrade"`
+	MinGrade      int    `json:"minGrade"`
+	CardsThisYear int    `json:"cardsThisYear"`
+}
+
 // ReportCardMonth is one payable month of a report card
 type ReportCardMonth struct {
 	Year     int        `json:"year" bson:"year"`
@@ -158,6 +166,7 @@ type ReportCardRepository interface {
 	ListByMonth(ctx context.Context, year int, fromMonth int, toMonth int, grade string, page int, limit int) ([]*ReportCard, int64, error)
 	MarkMonthsPaid(ctx context.Context, id string, year int, fromMonth int, toMonth int, paidBy string, paidByID string, paidAt time.Time) ([]ReportCardMonth, int, error)
 	GetMonthlyReport(ctx context.Context, year int, month int, skip int64, limit int64) ([]*MonthlyReportRow, *MonthlyReportSummary, error)
+	GetGradeLimit(ctx context.Context, applicationID string) (*GradeLimit, error)
 }
 
 // ReportCardUsecase defines the business logic interface
@@ -172,4 +181,6 @@ type ReportCardUsecase interface {
 	PayMonths(ctx context.Context, id string, year int, fromMonth int, toMonth int, userID string) (*PayMonthsResult, error)
 	GetMonthlyReport(ctx context.Context, year int, month int, page int, limit int) (*PaginatedMonthlyReport, error)
 	GetMonthlyReportAll(ctx context.Context, year int, month int) (*MonthlyReport, error)
+	GetGradeLimit(ctx context.Context, applicationID string) (*GradeLimit, error)
 }
+

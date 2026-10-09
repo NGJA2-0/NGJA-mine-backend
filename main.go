@@ -49,7 +49,8 @@ func main() {
 	miniSahanaUsecase := usecase.NewMiniSahanaUsecase(miniSahanaRepo, userRepo)
 	reportCardUsecase := usecase.NewReportCardUsecase(reportCardRepo, userRepo)
 	annualReportUsecase := usecase.NewAnnualReportUsecase(annualReportRepo)
-	applicationPaymentUsecase := usecase.NewApplicationPaymentUsecase(applicationPaymentRepo) // NEW
+	applicationPaymentUsecase := usecase.NewApplicationPaymentUsecase(applicationPaymentRepo)                         // NEW
+	applicationPaymentPDFUsecase := usecase.NewApplicationPaymentPDFUsecase(applicationPaymentRepo, reportCardRepo) // NEW
 
 	// Setup Handlers (Routes)
 	httpHandler.NewUserHandler(app, userUsecase)
@@ -58,7 +59,8 @@ func main() {
 	httpHandler.NewMiniSahanaHandler(app, miniSahanaUsecase, env.JWTSecret)
 	httpHandler.NewReportCardHandler(app, reportCardUsecase, env.JWTSecret)
 	httpHandler.NewAnnualReportHandler(app, annualReportUsecase, env.JWTSecret)
-	httpHandler.NewApplicationPaymentHandler(app, applicationPaymentUsecase, env.JWTSecret) // NEW
+	httpHandler.NewApplicationPaymentHandler(app, applicationPaymentUsecase, env.JWTSecret)       // NEW
+	httpHandler.NewApplicationPaymentPDFHandler(app, applicationPaymentPDFUsecase, env.JWTSecret) // NEW
 
 	// Root GET Route
 	app.Get("/", func(c *fiber.Ctx) error {

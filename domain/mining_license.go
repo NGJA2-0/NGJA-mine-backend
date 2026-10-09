@@ -282,6 +282,7 @@ type MiningLicenseRepository interface {
 	GetAllLatestFull(ctx context.Context) ([]MechanizedGemMiningLicense, error)
 	// ExistsByGMLNumber reports whether any document already uses this GML number.
 	ExistsByGMLNumber(ctx context.Context, gmlNumber string) (bool, error)
+	ExistsByGMLNumberExcludingBaseRef(ctx context.Context, gmlNumber string, baseRef string) (bool, error)
 
 }
 

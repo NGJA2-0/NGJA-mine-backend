@@ -133,6 +133,7 @@ type ExtendMiningLicenseRepository interface {
 	// GetMaxVersionByBaseRef returns the highest version suffix (e.g. 2 for "REF_2.2") stored
 	// for the given base reference number (e.g. "REF_2"). Returns 0 if none exist yet.
 	GetMaxVersionByBaseRef(ctx context.Context, baseRef string) (int, error)
+	ExistsByGMLNumberExcludingBaseRef(ctx context.Context, gmlNumber string, baseRef string) (bool, error)
 }
 
 // ExtendMiningLicenseUsecase defines business logic for mining license extend applications

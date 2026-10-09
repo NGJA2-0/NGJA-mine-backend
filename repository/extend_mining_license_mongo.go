@@ -259,3 +259,10 @@ func (r *extendMiningLicenseMongoRepo) GetMaxVersionByBaseRef(ctx context.Contex
 
 	return maxVersion, cursor.Err()
 }
+func (r *extendMiningLicenseMongoRepo) ExistsByGMLNumberExcludingBaseRef(ctx context.Context, gmlNumber, baseRef string) (bool, error) {
+	count, err := r.collection.CountDocuments(ctx, gmlExistsFilter(gmlNumber, baseRef), options.Count().SetLimit(1))
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

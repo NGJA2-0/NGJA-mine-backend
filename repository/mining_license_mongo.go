@@ -521,3 +521,22 @@ func (r *miningLicenseMongoRepo) ExistsByGMLNumber(ctx context.Context, gmlNumbe
 	}
 	return count > 0, nil
 }
+
+// gmlExistsFilter matches documents using this GML number. If baseRef is
+// non-empty, documents belonging to that reference family (REF_2, REF_2.1 ...)
+// are ignored, so a record's own versions don't count as duplicates.
+func gmlExistsFilter(gml, baseRef string) bson.M {
+	filter := bson.M{"gmlNumber": gml}
+	if baseRef != "" {
+		pattern := "^" + regexp.QuoteMeta(baseRef) + "($|\\.)"
+		filter["referenceNumber"] = bson.M{"$not": primitive.Regex{Pattern: pattern}}
+	}
+	return filter
+}
+func (r *miningLicenseMongoRepo) ExistsByGMLNumberExcludingBaseRef(ctx context.Context, gmlNumber, baseRef string) (bool, error) {
+	count, err := r.collection.CountDocuments(ctx, gmlExistsFilter(gmlNumber, baseRef), options.Count().SetLimit(1))
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

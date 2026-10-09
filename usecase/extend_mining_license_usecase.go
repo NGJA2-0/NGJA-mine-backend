@@ -59,6 +59,15 @@ func (u *extendMiningLicenseUsecase) Submit(ctx context.Context, license *domain
 	if license.GMLNumber == "" {
 		return nil, errors.New("gmlNumber is required")
 	}
+	license.GMLNumber = strings.TrimSpace(license.GMLNumber)
+	// If this is an extension of an existing record, ignore its own family.
+	taken, err := u.repo.ExistsByGMLNumberExcludingBaseRef(ctx, license.GMLNumber, baseRefOf(license.ReferenceNumber))
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify GML number: %w", err)
+	}
+	if taken {
+		return nil, errors.New("a mining license with this GML number already exists")
+	}
 	if len(license.GPSPoints) == 0 {
 		return nil, errors.New("at least one gpsPoint is required")
 	}
@@ -199,6 +208,19 @@ func (u *extendMiningLicenseUsecase) Edit(ctx context.Context, id string, update
 	if existing.ReferenceNumber == "" {
 		return nil, errors.New("existing license does not have a reference number")
 	}
+
+	gml := strings.TrimSpace(updatedLicense.GMLNumber)
+	if gml == "" {
+		return nil, errors.New("gmlNumber is required")
+	}
+	taken, err := u.repo.ExistsByGMLNumberExcludingBaseRef(ctx, gml, baseRefOf(existing.ReferenceNumber))
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify GML number: %w", err)
+	}
+	if taken {
+		return nil, errors.New("a mining license with this GML number already exists")
+	}
+	updatedLicense.GMLNumber = gml
 
 	// 2. Compute next version
 	nextRef, err := u.nextVersionedRef(ctx, existing.ReferenceNumber)

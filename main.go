@@ -39,6 +39,7 @@ func main() {
 	extendMiningLicenseRepo := repository.NewExtendMiningLicenseRepository(db)
 	miniSahanaRepo := repository.NewMiniSahanaRepository(db)
 	reportCardRepo := repository.NewReportCardRepository(db)
+	annualReportRepo := repository.NewAnnualReportRepository(db)
 
 	// Setup Usecases
 	userUsecase := usecase.NewUserUsecase(userRepo, env.JWTSecret)
@@ -46,6 +47,7 @@ func main() {
 	extendMiningLicenseUsecase := usecase.NewExtendMiningLicenseUsecase(extendMiningLicenseRepo)
 	miniSahanaUsecase := usecase.NewMiniSahanaUsecase(miniSahanaRepo, userRepo)
 	reportCardUsecase := usecase.NewReportCardUsecase(reportCardRepo, userRepo)
+	annualReportUsecase := usecase.NewAnnualReportUsecase(annualReportRepo)
 
 	// Setup Handlers (Routes)
 	httpHandler.NewUserHandler(app, userUsecase)
@@ -53,6 +55,7 @@ func main() {
 	httpHandler.NewExtendMiningLicenseHandler(app, extendMiningLicenseUsecase, userUsecase, env.JWTSecret)
 	httpHandler.NewMiniSahanaHandler(app, miniSahanaUsecase, env.JWTSecret)
 	httpHandler.NewReportCardHandler(app, reportCardUsecase, env.JWTSecret)
+	httpHandler.NewAnnualReportHandler(app, annualReportUsecase, env.JWTSecret)
 
 	// Root GET Route
 	app.Get("/", func(c *fiber.Ctx) error {

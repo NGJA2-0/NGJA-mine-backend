@@ -516,5 +516,22 @@ func (r *reportCardMongoRepo) GetGradeLimit(ctx context.Context, applicationID s
 		}
 	}
 
-	return &domain.GradeLimit{AppliedGrade: app.Grade, MinGrade: minGrade}, nil
+	// 3. How many cards were already submitted this year
+	year := time.Now().Year()
+	start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(1, 0, 0)
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{
+		"applicationId": applicationID,
+		"createdAt":     bson.M{"$gte": start, "$lt": end},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.GradeLimit{
+		AppliedGrade:  app.Grade,
+		MinGrade:      minGrade,
+		CardsThisYear: int(count),
+	}, nil
 }

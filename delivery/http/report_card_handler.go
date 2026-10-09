@@ -106,6 +106,12 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	if limit.CardsThisYear >= domain.MaxReportCardsPerYear {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("only %d report cards can be added per student per year", domain.MaxReportCardsPerYear),
+		})
+	}
+
 	// Handle PDF file upload
 	file, err := c.FormFile("pdf")
 	if err != nil {

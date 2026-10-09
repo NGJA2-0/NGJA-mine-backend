@@ -36,9 +36,12 @@ type ReportCard struct {
 	CreatedAt     time.Time          `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
 }
 
+const MaxReportCardsPerYear = 2
+
 type GradeLimit struct {
-	AppliedGrade string `json:"appliedGrade"`
-	MinGrade     int    `json:"minGrade"`
+	AppliedGrade  string `json:"appliedGrade"`
+	MinGrade      int    `json:"minGrade"`
+	CardsThisYear int    `json:"cardsThisYear"`
 }
 
 // ReportCardMonth is one payable month of a report card

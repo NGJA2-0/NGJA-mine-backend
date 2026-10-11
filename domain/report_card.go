@@ -42,6 +42,7 @@ type GradeLimit struct {
 	AppliedGrade  string `json:"appliedGrade"`
 	MinGrade      int    `json:"minGrade"`
 	CardsThisYear int    `json:"cardsThisYear"`
+	FullName      string `json:"-"` // English name from the application; server-side only
 }
 
 // ReportCardMonth is one payable month of a report card

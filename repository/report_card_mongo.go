@@ -484,10 +484,14 @@ func (r *reportCardMongoRepo) GetGradeLimit(ctx context.Context, applicationID s
 	// 1. The grade the student applied with
 	var app struct {
 		Grade string `bson:"grade"`
+		ApplicantFullNameEnglish string `bson:"applicantFullNameEnglish"`
 	}
 	err = r.db.Collection("applications").
-		FindOne(ctx, bson.M{"_id": oid}, options.FindOne().SetProjection(bson.M{"grade": 1})).
-		Decode(&app)
+	FindOne(ctx, bson.M{"_id": oid}, options.FindOne().SetProjection(bson.M{
+		"grade":                    1,
+		"applicantFullNameEnglish": 1,
+	})).
+	Decode(&app)
 	if err == mongo.ErrNoDocuments {
 		return nil, errors.New("application not found")
 	}
@@ -533,5 +537,6 @@ func (r *reportCardMongoRepo) GetGradeLimit(ctx context.Context, applicationID s
 		AppliedGrade:  app.Grade,
 		MinGrade:      minGrade,
 		CardsThisYear: int(count),
+		FullName:      app.ApplicantFullNameEnglish,
 	}, nil
 }

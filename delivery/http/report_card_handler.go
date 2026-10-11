@@ -94,6 +94,9 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 	}
 	card.AppliedGrade = limit.AppliedGrade // take it from the application, not the client
 
+	if limit.FullName != "" {
+		card.FullName = limit.FullName // English name from the application
+	}
 	grade, _ := strconv.Atoi(card.CurrentGrade)
 	if grade < limit.MinGrade {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

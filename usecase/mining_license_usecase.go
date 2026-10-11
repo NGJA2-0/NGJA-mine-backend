@@ -211,6 +211,21 @@ func (u *miningLicenseUsecase) Edit(ctx context.Context, id string, updatedLicen
 	if baseRef == "" {
 		return nil, errors.New("existing license does not have a reference number")
 	}
+
+		// GML must be unique across other records (own versions are allowed).
+	gml := strings.TrimSpace(updatedLicense.GMLNumber)
+	if gml == "" {
+		return nil, errors.New("gmlNumber is required")
+	}
+	taken, err := u.repo.ExistsByGMLNumberExcludingBaseRef(ctx, gml, baseRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify GML number: %w", err)
+	}
+	if taken {
+		return nil, errors.New("a mining license with this GML number already exists")
+	}
+	updatedLicense.GMLNumber = gml
+
 	if parts := strings.Split(baseRef, "."); len(parts) >= 2 {
 		baseRef = parts[0]
 	}
@@ -712,4 +727,12 @@ func (u *miningLicenseUsecase) ExistsByGMLNumber(ctx context.Context, gmlNumber 
 		return false, nil
 	}
 	return u.repo.ExistsByGMLNumber(ctx, gmlNumber)
+}
+
+// baseRefOf strips the version suffix: "REF_2.1" -> "REF_2".
+func baseRefOf(ref string) string {
+	if idx := strings.Index(ref, "."); idx != -1 {
+		return ref[:idx]
+	}
+	return ref
 }

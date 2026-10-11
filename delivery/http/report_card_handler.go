@@ -124,8 +124,8 @@ func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "only PDF files are allowed"})
 	}
 
-	// Grade 12 requires an O/L certificate (existing one on the application, or a new upload)
-	if card.CurrentGrade == "12" {
+	// Grade 12 an 13 requires an O/L certificate (existing one on the application, or a new upload)
+	if requiresOLCertificate(card.CurrentGrade) {
 		existing, err := h.Usecase.GetOLCertificate(c.Context(), card.ApplicationID)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -255,6 +255,10 @@ func (h *ReportCardHandler) GetOLCertificateStatus(c *fiber.Ctx) error {
 		"uploadedBy": doc.UploadedBy,
 		"uploadedAt": doc.UploadedAt,
 	})
+}
+
+func requiresOLCertificate(grade string) bool {
+	return grade == "12" || grade == "13"
 }
 
 func (h *ReportCardHandler) GetOLCertificateFile(c *fiber.Ctx) error {

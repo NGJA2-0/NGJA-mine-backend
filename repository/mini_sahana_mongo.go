@@ -77,6 +77,7 @@ func (r *miniSahanaMongoRepo) Search(ctx context.Context, query string) ([]*doma
 	filter := bson.M{
 		"$or": []bson.M{
 			{"applicantFullNameSinhala": bson.M{"$regex": query, "$options": "i"}},
+			{"applicantFullNameEnglish": bson.M{"$regex": query, "$options": "i"}},
 			{"bankAccountNumber": bson.M{"$regex": query, "$options": "i"}},
 			{"nic": bson.M{"$regex": query, "$options": "i"}},
 			{"grade":                        bson.M{"$regex": query, "$options": "i"}},

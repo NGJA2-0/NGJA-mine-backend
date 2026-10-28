@@ -41,6 +41,7 @@ func main() {
 	reportCardRepo := repository.NewReportCardRepository(db)
 	annualReportRepo := repository.NewAnnualReportRepository(db)
 	applicationPaymentRepo := repository.NewApplicationPaymentRepository(db) // NEW
+	overviewRepo := repository.NewPaymentOverviewRepository(db)
 
 	// Setup Usecases
 	userUsecase := usecase.NewUserUsecase(userRepo, env.JWTSecret)
@@ -51,6 +52,7 @@ func main() {
 	annualReportUsecase := usecase.NewAnnualReportUsecase(annualReportRepo)
 	applicationPaymentUsecase := usecase.NewApplicationPaymentUsecase(applicationPaymentRepo)                         // NEW
 	applicationPaymentPDFUsecase := usecase.NewApplicationPaymentPDFUsecase(applicationPaymentRepo, reportCardRepo) // NEW
+	overviewUC := usecase.NewPaymentOverviewUsecase(overviewRepo)
 
 	// Setup Handlers (Routes)
 	httpHandler.NewUserHandler(app, userUsecase)
@@ -61,7 +63,8 @@ func main() {
 	httpHandler.NewAnnualReportHandler(app, annualReportUsecase, env.JWTSecret)
 	httpHandler.NewApplicationPaymentHandler(app, applicationPaymentUsecase, env.JWTSecret)       // NEW
 	httpHandler.NewApplicationPaymentPDFHandler(app, applicationPaymentPDFUsecase, env.JWTSecret) // NEW
-
+	httpHandler.NewPaymentOverviewHandler(app, overviewUC, env.JWTSecret)
+	
 	// Root GET Route
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendString("Hello, Go Fiber!")

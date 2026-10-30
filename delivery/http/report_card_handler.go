@@ -38,6 +38,7 @@ func NewReportCardHandler(app *fiber.App, us domain.ReportCardUsecase, jwtSecret
 	api.Get("/ol-certificate/:applicationId", handler.GetOLCertificateStatus)
 	api.Get("/ol-certificate/:applicationId/file", handler.GetOLCertificateFile)
 	api.Get("/grade-limit/:applicationId", handler.GetGradeLimit)
+	api.Get("/pdf/:refNumber", handler.GetPDF)
 }
 
 func (h *ReportCardHandler) Create(c *fiber.Ctx) error {
@@ -415,4 +416,23 @@ func (h *ReportCardHandler) GetGradeLimit(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(limit)
+}
+var refNumberRe = regexp.MustCompile(`^REF-rec-\d+$`)
+
+func (h *ReportCardHandler) GetPDF(c *fiber.Ctx) error {
+	ref := c.Params("refNumber")
+
+	// Strict whitelist, which also blocks path traversal like ../../etc/passwd
+	if !refNumberRe.MatchString(ref) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid reference number"})
+	}
+
+	path := filepath.Join("report_cards", ref+".pdf")
+	if _, err := os.Stat(path); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "PDF not found"})
+	}
+
+	c.Set("Content-Type", "application/pdf")
+	c.Set("Content-Disposition", "inline")
+	return c.SendFile(path)
 }
